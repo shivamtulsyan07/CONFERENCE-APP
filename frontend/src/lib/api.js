@@ -31,6 +31,7 @@ export const api = {
   deleteLineRow: (sheet, id) => http.delete(`/line-sheet/${sheet}/${id}`).then((r) => r.data),
   companyBalance: () => http.get("/company-balance").then((r) => r.data),
   stats: () => http.get("/stats/dashboard").then((r) => r.data),
+  overview: () => http.get("/stats/overview").then((r) => r.data),
   seed: () => http.post("/seed").then((r) => r.data),
 };
 

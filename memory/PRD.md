@@ -41,6 +41,8 @@ Module to take orders from customers, order from the company, and dispatch party
 - Company Balance Order (/company-balance) + Stock Arrived From Company (/stock-arrived): shared editable LineSheet component over collections `company_sent_rows` and `company_arrived_rows` (Group, Item, Shade, Quantity, Date, Remark). GET /api/company-balance nets sent − arrived per Group+Item+Shade; Company Balance Order shows read-only ARRIVED and BALANCE columns plus stat cards. Endpoints: /api/line-sheet/{company-sent-rows|company-arrived-rows} (GET, /bulk, /replace, DELETE).
 - Footer counts exclude the trailing blank sentinel row (sheet.dataCount).
 
+- 2026-06 Dashboard v3 (professional control room): dark, dense, chart-free "Operations Control Room" at `/`. 7 KPI tiles (conference qty, order value, in-house stock, to-order-from-company, pending at company, sent/arrived, % rows ready) + 4 scrollable dense tables: Pending reminder with company (sent−arrived, last sent date), Shortfall to order from company, Top items by quantity, Party-wise conference summary (rows/items/qty/value/ready/pending/billed + readiness bar). Full Screen button uses the browser Fullscreen API with an edge-to-edge dense layout; manual Refresh only (no auto-poll). New endpoint `GET /api/stats/overview`. Verified: iteration_8 (backend 100%, frontend 100%).
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

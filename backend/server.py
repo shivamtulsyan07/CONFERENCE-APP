@@ -724,6 +724,122 @@ async def dashboard_stats():
     }
 
 
+@api_router.get("/stats/overview")
+async def dashboard_overview():
+    orders = await db.order_rows.find().to_list(20000)
+    stock = await db.stock_rows.find().to_list(20000)
+    sent = await db.company_sent_rows.find().to_list(20000)
+    arrived = await db.company_arrived_rows.find().to_list(20000)
+
+    def key3(g, i, s):
+        return (str(g or "").strip().upper(), str(i or "").strip().upper(), str(s or "").strip())
+
+    total_qty = total_amount = billed = 0
+    status_counts = {"not_ready": 0, "arrived": 0, "ready": 0}
+    party_wise = {}
+    item_wise = {}
+    for r in orders:
+        qty = r.get("qty") or 0
+        amt = r.get("amount") or 0
+        total_qty += qty
+        total_amount += amt
+        st = r.get("status", "not_ready")
+        status_counts[st] = status_counts.get(st, 0) + 1
+        if str(r.get("bill_no", "")).strip():
+            billed += 1
+        party = str(r.get("party_name", "")).strip() or "—"
+        e = party_wise.setdefault(party, {
+            "party": party, "rows": 0, "qty": 0, "amount": 0,
+            "ready": 0, "pending": 0, "billed": 0, "items": set(),
+        })
+        e["rows"] += 1
+        e["qty"] += qty
+        e["amount"] += amt
+        if str(r.get("bill_no", "")).strip():
+            e["billed"] += 1
+        if st == "ready":
+            e["ready"] += 1
+        else:
+            e["pending"] += 1
+        item = str(r.get("item", "")).strip()
+        if item:
+            e["items"].add(item.upper())
+            it = item_wise.setdefault(item.upper(), {
+                "item": item, "group": str(r.get("group", "")).strip(), "qty": 0, "rows": 0, "parties": set(),
+            })
+            it["qty"] += qty
+            it["rows"] += 1
+            if party != "—":
+                it["parties"].add(party)
+
+    parties_out = []
+    for e in party_wise.values():
+        parties_out.append({
+            **{k: v for k, v in e.items() if k != "items"},
+            "items": len(e["items"]),
+            "ready_pct": round(100 * e["ready"] / e["rows"]) if e["rows"] else 0,
+        })
+    parties_out.sort(key=lambda x: -x["qty"])
+
+    items_out = []
+    for e in item_wise.values():
+        items_out.append({**{k: v for k, v in e.items() if k != "parties"}, "parties": len(e["parties"])})
+    items_out.sort(key=lambda x: -x["qty"])
+
+    # pending with company: sent - arrived
+    agg = {}
+    for r in sent:
+        if not str(r.get("item", "")).strip():
+            continue
+        e = agg.setdefault(key3(r.get("group"), r.get("item"), r.get("shade")), {
+            "group": str(r.get("group", "")).strip(), "item": str(r.get("item", "")).strip(),
+            "shade": str(r.get("shade", "")).strip(), "sent_qty": 0, "arrived_qty": 0, "last_date": "",
+        })
+        e["sent_qty"] += r.get("quantity") or 0
+        d = str(r.get("date", "")).strip()
+        if d > e["last_date"]:
+            e["last_date"] = d
+    for r in arrived:
+        if not str(r.get("item", "")).strip():
+            continue
+        e = agg.setdefault(key3(r.get("group"), r.get("item"), r.get("shade")), {
+            "group": str(r.get("group", "")).strip(), "item": str(r.get("item", "")).strip(),
+            "shade": str(r.get("shade", "")).strip(), "sent_qty": 0, "arrived_qty": 0, "last_date": "",
+        })
+        e["arrived_qty"] += r.get("quantity") or 0
+    company = []
+    for e in agg.values():
+        company.append({**e, "balance_qty": e["sent_qty"] - e["arrived_qty"]})
+    pending_company = sorted([c for c in company if c["balance_qty"] > 0], key=lambda x: -x["balance_qty"])
+
+    shortfalls = [r for r in company_order_rows_sync(orders, stock) if r["to_order"] > 0]
+    shortfalls.sort(key=lambda x: -x["to_order"])
+
+    return {
+        "kpis": {
+            "order_rows": len(orders),
+            "order_qty": total_qty,
+            "order_amount": total_amount,
+            "billed_rows": billed,
+            "unbilled_rows": len(orders) - billed,
+            "parties": len(parties_out),
+            "stock_lines": len(stock),
+            "stock_qty": sum(s.get("quantity") or 0 for s in stock),
+            "sent_qty": sum(c["sent_qty"] for c in company),
+            "arrived_qty": sum(c["arrived_qty"] for c in company),
+            "pending_company_qty": sum(c["balance_qty"] for c in pending_company),
+            "pending_company_lines": len(pending_company),
+            "shortfall_lines": len(shortfalls),
+            "shortfall_qty": sum(r["to_order"] for r in shortfalls),
+        },
+        "status_counts": status_counts,
+        "party_wise": parties_out,
+        "item_wise": items_out,
+        "pending_company": pending_company,
+        "shortfalls": shortfalls,
+    }
+
+
 @api_router.post("/seed")
 async def seed():
     if await db.order_rows.count_documents({}) > 0:

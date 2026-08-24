@@ -1,0 +1,18 @@
+{
+  "summary": "Tested new /api/stats/overview endpoint and Dashboard.jsx rewrite (Operations Control Room). Backend: 5/5 pytest cases passed - validated shape (kpis, status_counts, party_wise, item_wise, pending_company, shortfalls), math (party qty sum = total qty, shortfalls all >0, pending_company balances >0, sums match kpis, status_counts match order rows). Regression on /orders, /stock, /parties, /lookups, /company-order, /company-balance, /balance-stock, /order-summary all 200. Frontend: All 7 KPI tiles render with non-empty values, all 4 panels visible (pending-company, shortfalls, top-items, party-wise), party-row-0 with readiness bar visible, refresh-btn triggers reload cleanly, fullscreen-btn toggles label between 'Full screen' and 'Exit full screen'. No console errors on dashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_dashboard_overview.py", "/app/test_reports/pytest/iter8_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: /api/stock-rows/bulk route is registered twice (duplicate @api_router.post decorators at lines 290-291) - harmless but should be cleaned up.",
+    "In fullscreen toggle, headless browsers reject requestFullscreen (Permissions API); the catch flips local state but the container div does not gain fixed-inset styling because we only set `full=true` when document.fullscreenElement is present via onChange. However the label depends on `full` state which is toggled in the catch, so labels flip correctly. Consider forcing setFull(true) after successful requestFullscreen too for robustness.",
+    "Dashboard.jsx (329 lines) is fine size-wise. money() shows ₹0 for all rows since rate=0 in seed - expected but might confuse users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Called POST /api/seed (idempotent - already seeded).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New endpoint /api/stats/overview and Dashboard.jsx are verified. Seed has ~812 order rows across 10 parties, 684 shortfall lines, 0 sent/arrived (so pending_company is empty). All KPI/Panel data-testids stable: kpi-*, panel-*, party-row-N, refresh-btn, fullscreen-btn, dashboard-page, seed-btn."
+}
