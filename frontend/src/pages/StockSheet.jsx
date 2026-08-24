@@ -8,24 +8,24 @@ import { toast } from "sonner";
 import { Save, Trash2, Filter } from "lucide-react";
 
 export default function StockSheet() {
-  const [lookups, setLookups] = useState({ groups: [], items: [], shades: [] });
+  const [lookups, setLookups] = useState({ conferences: [], items: [], shades: [] });
   const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
   const columns = [
-    { key: "group", label: "Group", width: 140, options: lookups.groups, upper: true },
+    { key: "conference", label: "Conference Name", width: 170, options: lookups.conferences, upper: true },
     { key: "item", label: "Item Name", width: 240, options: lookups.items, upper: true },
     { key: "shade", label: "Shade", width: 120 },
     { key: "quantity", label: "Quantity", width: 110, numeric: true },
   ];
 
-  const blankRow = { group: "SH ROLL", item: "", shade: "", quantity: "" };
+  const blankRow = { conference: "SH ROLL", item: "", shade: "", quantity: "" };
 
   const blankZeros = (rows) => rows.map((r) => ({ ...r, quantity: r.quantity || "" }));
   const load = useCallback(() => api.stockRows().then(blankZeros), []);
   const save = useCallback((rows) => api.saveStockRows(rows.map((r) => ({
-    group: r.group || "",
+    conference: r.conference || "",
     item: r.item || "",
     shade: String(r.shade ?? ""),
     quantity: Number(r.quantity) || 0,

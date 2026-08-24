@@ -8,27 +8,26 @@ import { toast } from "sonner";
 import { Save, Trash2, Wand2, Filter } from "lucide-react";
 
 export default function OrderSheet() {
-  const [lookups, setLookups] = useState({ parties: [], groups: [], items: [], shades: [], bill_nos: [], party_pages: {} });
+  const [lookups, setLookups] = useState({ parties: [], conferences: [], items: [], shades: [], bill_nos: [], party_pages: {} });
   const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
   const columns = [
     { key: "party_name", label: "Party Name", width: 260, options: lookups.parties, upper: true },
-    { key: "page", label: "Page", width: 70, numeric: true },
-    { key: "group", label: "Group", width: 110, options: lookups.groups, upper: true },
-    { key: "item", label: "ITEM", width: 190, options: lookups.items, upper: true },
-    { key: "shade", label: "SHADE", width: 90 },
-    { key: "qty", label: "QTY", width: 70, numeric: true },
+    { key: "page", label: "Page No.", width: 80, numeric: true },
+    { key: "conference", label: "Conference Name", width: 170, options: lookups.conferences, upper: true },
+    { key: "item", label: "Item", width: 190, options: lookups.items, upper: true },
+    { key: "shade", label: "Shade", width: 90 },
+    { key: "qty", label: "Qty", width: 70, numeric: true },
     { key: "mtr", label: "MTR", width: 110 },
+    { key: "bill_no", label: "Bill Number", width: 120, options: lookups.bill_nos, upper: true },
     { key: "rate", label: "Rate", width: 90, numeric: true },
-    { key: "amount", label: "Amount", width: 110, numeric: true },
-    { key: "bill_no", label: "BILL NO", width: 110, options: lookups.bill_nos, upper: true },
   ];
 
   const blankRow = {
-    party_name: "", page: "", group: "SH ROLL", item: "", shade: "",
-    qty: "", mtr: "", rate: "", amount: "", bill_no: "", status: "not_ready",
+    party_name: "", page: "", conference: "SH ROLL", item: "", shade: "",
+    qty: "", mtr: "", bill_no: "", rate: "", amount: "", status: "not_ready",
   };
 
   const blankZeros = (rows) =>
@@ -41,7 +40,7 @@ export default function OrderSheet() {
     shade: String(r.shade ?? ""),
     qty: Number(r.qty) || 0,
     rate: Number(r.rate) || 0,
-    amount: Number(r.amount) || 0,
+    amount: (Number(r.qty) || 0) * (Number(r.rate) || 0),
   }))).then(blankZeros), []);
 
   const sheet = useSheet({ columns, load, save, remove: api.deleteOrderRow, blankRow, minRows: 15 });
@@ -50,13 +49,6 @@ export default function OrderSheet() {
     if (col.key === "party_name") {
       const page = lookups.party_pages?.[value];
       sheet.setRow(idx, page ? { party_name: value, page } : { party_name: value });
-      return;
-    }
-    if (col.key === "qty" || col.key === "rate") {
-      const row = sheet.rows[idx];
-      const qty = col.key === "qty" ? Number(value) || 0 : Number(row.qty) || 0;
-      const rate = col.key === "rate" ? Number(value) || 0 : Number(row.rate) || 0;
-      sheet.setRow(idx, { [col.key]: value, amount: qty && rate ? qty * rate : row.amount });
       return;
     }
     sheet.setCell(idx, col.key, value);
@@ -85,7 +77,10 @@ export default function OrderSheet() {
   };
 
   const totals = sheet.filtered.reduce(
-    (a, { row }) => ({ qty: a.qty + (Number(row.qty) || 0), amount: a.amount + (Number(row.amount) || 0) }),
+    (a, { row }) => ({
+      qty: a.qty + (Number(row.qty) || 0),
+      amount: a.amount + (Number(row.qty) || 0) * (Number(row.rate) || 0),
+    }),
     { qty: 0, amount: 0 }
   );
 
@@ -95,7 +90,7 @@ export default function OrderSheet() {
         <div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Order Sheet</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the colour box to change status
+            Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the SR number to change row colour
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -125,7 +120,7 @@ export default function OrderSheet() {
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3F6F52] text-white">
-              <th className="w-10 border-r border-[#2f5540] px-2 py-2 text-xs font-semibold">#</th>
+              <th className="w-12 border-r border-[#2f5540] px-2 py-2 text-xs font-semibold">SR</th>
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-[#2f5540] px-2 py-2 text-xs font-bold uppercase tracking-wide text-left"
                   style={{ width: c.width, minWidth: c.width }}>
@@ -194,10 +189,9 @@ export default function OrderSheet() {
               <td className="px-2 py-2 text-xs">Σ</td>
               <td colSpan={4} className="px-2 py-2 text-xs">{sheet.filtered.length} rows shown</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="total-qty">{totals.qty}</td>
-              <td />
-              <td />
+              <td colSpan={2} className="px-2 py-2 text-xs text-right">Value</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="total-amount">{money(totals.amount)}</td>
-              <td colSpan={2} />
+              <td />
             </tr>
           </tfoot>
         </table>

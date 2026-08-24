@@ -73,7 +73,7 @@ class PartyCreate(BaseModel):
 class OrderRow(BaseDocument):
     party_name: str = ""
     page: str = ""
-    group: str = ""
+    conference: str = ""
     item: str = ""
     shade: str = ""
     qty: float = 0
@@ -90,7 +90,7 @@ class OrderRowIn(BaseModel):
     id: Optional[str] = None
     party_name: str = ""
     page: str = ""
-    group: str = ""
+    conference: str = ""
     item: str = ""
     shade: str = ""
     qty: float = 0
@@ -104,7 +104,7 @@ class OrderRowIn(BaseModel):
 
 # ---------- Stock sheet row ----------
 class StockRow(BaseDocument):
-    group: str = ""
+    conference: str = ""
     item: str = ""
     shade: str = ""
     quantity: float = 0
@@ -114,7 +114,7 @@ class StockRow(BaseDocument):
 
 class StockRowIn(BaseModel):
     id: Optional[str] = None
-    group: str = ""
+    conference: str = ""
     item: str = ""
     shade: str = ""
     quantity: float = 0
@@ -134,7 +134,7 @@ def is_blank_order(r: OrderRowIn):
 
 
 def is_blank_stock(r: StockRowIn):
-    return not any([r.group.strip(), r.item.strip(), r.shade.strip(), r.quantity])
+    return not any([r.conference.strip(), r.item.strip(), r.shade.strip(), r.quantity])
 
 
 # ---------- Parties API ----------
@@ -255,7 +255,7 @@ async def lookups():
         "party_pages": {
             p["name"]: p.get("page", "") for p in parties if p.get("page")
         },
-        "groups": uniq([r.get("group", "") for r in order_rows] + [r.get("group", "") for r in stock_rows] + ["SH ROLL"]),
+        "conferences": uniq([r.get("conference", "") for r in order_rows] + [r.get("conference", "") for r in stock_rows] + ["SH ROLL"]),
         "items": uniq([r.get("item", "") for r in order_rows] + [r.get("item", "") for r in stock_rows]),
         "shades": uniq([r.get("shade", "") for r in order_rows] + [r.get("shade", "") for r in stock_rows]),
         "bill_nos": uniq([r.get("bill_no", "") for r in order_rows]),
@@ -338,7 +338,7 @@ async def seed():
     ]
     await db.order_rows.insert_many([
         {
-            "party_name": p, "page": pg, "group": "SH ROLL", "item": item, "shade": shade,
+            "party_name": p, "page": pg, "conference": "SH ROLL", "item": item, "shade": shade,
             "qty": qty, "mtr": mtr, "rate": 0, "amount": 0, "bill_no": bill,
             "status": st, "row_index": idx, "created_at": now_iso(),
         }
@@ -350,7 +350,7 @@ async def seed():
         ("SENSATIONAL CS", "211"), ("SENSATIONAL CS", "212"),
     ]
     await db.stock_rows.insert_many([
-        {"group": "SH ROLL", "item": i, "shade": s, "quantity": 3, "row_index": idx, "created_at": now_iso()}
+        {"conference": "SH ROLL", "item": i, "shade": s, "quantity": 3, "row_index": idx, "created_at": now_iso()}
         for idx, (i, s) in enumerate(stock)
     ])
     return {"seeded": True}
