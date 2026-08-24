@@ -15,6 +15,7 @@ import StockArrived from "@/pages/StockArrived";
 import Parties from "@/pages/Parties";
 import Shop from "@/pages/Shop";
 import ShopSale from "@/pages/ShopSale";
+import ExtraStock from "@/pages/ExtraStock";
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
             <Route path="/company-balance" element={<CompanyBalanceOrder />} />
             <Route path="/stock-arrived" element={<StockArrived />} />
             <Route path="/balance" element={<BalanceStock />} />
+            <Route path="/extra-stock" element={<ExtraStock />} />
             <Route path="/parties" element={<Parties />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/shop-sale" element={<ShopSale />} />

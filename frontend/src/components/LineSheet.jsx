@@ -26,6 +26,7 @@ export const LineSheet = ({
   onSaved,
   toolbarExtras,
   stats,
+  visibleFilter,
 }) => {
   const [lookups, setLookups] = useState({ groups: [], items: [], shades: [] });
   const [showFilters, setShowFilters] = useState(true);
@@ -77,10 +78,15 @@ export const LineSheet = ({
     blankRow, minRows: 15,
   });
   const sheet = { ...sheetBase, onContextMenu: setMenu };
-  const win = useWindowRows(sheetBase.filtered.length);
+  const visible = useMemo(
+    () => (visibleFilter ? sheetBase.filtered.filter(({ row }) => visibleFilter(row)) : sheetBase.filtered),
+    [sheetBase.filtered, visibleFilter]
+  );
+  const win = useWindowRows(visible.length);
   useEffect(() => { sheetBase.setEnsureVisible(win.scrollToRow); }, [win.scrollToRow]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { sheetBase.setScrollEl(win.scrollRef.current); sheetBase.setWindowRecalc(win.onScroll); }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
+  const totalQty = visible.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
   return (
     <SheetFrame
@@ -154,7 +160,7 @@ export const LineSheet = ({
             {win.padTop > 0 && (
               <tr aria-hidden style={{ height: win.padTop }}><td colSpan={columns.length + extraColumns.length + 2} /></tr>
             )}
-            {sheet.filtered.slice(win.start, win.end).map(({ row, idx }) => (
+            {visible.slice(win.start, win.end).map(({ row, idx }) => (
               <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" style={{ height: win.rowHeight }} data-testid={`${prefix}row-${idx}`}>
                 <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {idx + 1}
@@ -204,7 +210,7 @@ export const LineSheet = ({
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
               <td colSpan={Math.max(1, columns.length - 3)} className="px-2 py-2 text-xs">
-                {sheet.dataCount} rows shown
+                {visible.reduce((n, { row }) => (String(row.item || "").trim() || String(row.party_name || "").trim() ? n + 1 : n), 0)} rows shown
               </td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid={`${prefix}total-qty`}>{totalQty}</td>
               <td colSpan={2 + extraColumns.length + 1} />

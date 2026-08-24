@@ -7,7 +7,7 @@ export function useWindowRows(total, rowHeight = 33, overscan = 14) {
 
   const raf = useRef(0);
   const recompute = useCallback(() => {
-    if (raf.current) return;
+    if (raf.current) cancelAnimationFrame(raf.current);
     raf.current = requestAnimationFrame(() => {
       raf.current = 0;
       const el = scrollRef.current;

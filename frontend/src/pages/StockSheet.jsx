@@ -48,6 +48,7 @@ export default function StockSheet() {
   const sheet = { ...sheetBase, onContextMenu: setMenu };
   const win = useWindowRows(sheetBase.filtered.length);
   useEffect(() => { sheetBase.setEnsureVisible(win.scrollToRow); }, [win.scrollToRow]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { sheetBase.setScrollEl(win.scrollRef.current); sheetBase.setWindowRecalc(win.onScroll); }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 

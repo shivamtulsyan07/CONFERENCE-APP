@@ -52,7 +52,7 @@ export const SheetCell = memo(({
           title="Drag to copy down"
           onMouseDown={(e) => {
             e.preventDefault();
-            sheet.fillStart(rowIndex, colIndex, column.key, value ?? "");
+            sheet.fillStart(rowIndex, colIndex);
           }}
           className="sheet-fill-handle"
         />

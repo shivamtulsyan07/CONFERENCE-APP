@@ -164,23 +164,30 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
     }
   };
 
-  const applyMatrix = (matrix, startRow, startCol) => {
+  const applyMatrix = (matrix, startRow, startCol, repeatTo = null) => {
     const cols = cfg.current.columns;
     pushHistory();
     const next = [...rowsRef.current];
-    matrix.forEach((line, ri) => {
+    // repeat the copied block across the target range, like Excel
+    const rowSpan = repeatTo ? Math.max(matrix.length, repeatTo.r2 - startRow + 1) : matrix.length;
+    const colSpan = repeatTo
+      ? Math.max(matrix[0]?.length || 0, repeatTo.c2 - startCol + 1)
+      : matrix[0]?.length || 0;
+    for (let ri = 0; ri < rowSpan; ri++) {
       const target = startRow + ri;
       while (next.length <= target) next.push(newRow(next.length));
+      const line = matrix[ri % matrix.length];
       const patch = {};
-      line.forEach((val, ci) => {
+      for (let ci = 0; ci < colSpan; ci++) {
         const col = cols[startCol + ci];
-        if (!col) return;
+        if (!col) continue;
+        const val = line[ci % line.length];
         patch[col.key] = col.numeric ? String(val).replace(/[^0-9.]/g, "") : String(val).trim();
-      });
+      }
       next[target] = { ...next[target], ...patch };
       dirty.current.add(target);
-    });
-    while (next.length < startRow + matrix.length + 1) next.push(newRow(next.length));
+    }
+    while (next.length < startRow + rowSpan + 1) next.push(newRow(next.length));
     commit(next);
     scheduleSave();
   };
@@ -336,20 +343,26 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
     try { text = await navigator.clipboard.readText(); } catch (e) { return; }
     if (!text) return;
     const matrix = text.replace(/\r/g, "").split("\n").filter((l) => l !== "").map((l) => l.split("\t"));
-    if (matrix.length) applyMatrix(matrix, b.r1, b.c1);
+    const multi = b.r1 !== b.r2 || b.c1 !== b.c2;
+    if (matrix.length) applyMatrix(matrix, b.r1, b.c1, multi ? b : null);
   };
 
-  const fillStart = (idx, colIndex, key, value) => {
-    const f = { col: colIndex, key, value, from: idx, to: idx };
+  // ---- fill (drag the corner handle): block-aware, unlimited rows ----
+  const fillStart = (rowIndex, colIndex) => {
+    const b = selBounds();
+    const inSel = b && rowIndex >= b.r1 && rowIndex <= b.r2 && colIndex >= b.c1 && colIndex <= b.c2;
+    const src = inSel ? b : { r1: rowIndex, r2: rowIndex, c1: colIndex, c2: colIndex };
+    const f = { src, to: src.r2 };
     fillRef.current = f;
     setFill(f);
   };
 
-  const fillOver = (idx) => {
-    if (!fillRef.current) return;
-    const f = { ...fillRef.current, to: idx };
-    fillRef.current = f;
-    setFill(f);
+  const fillOver = (rowIndex) => {
+    const f = fillRef.current;
+    if (!f || f.to === rowIndex) return;
+    const n = { ...f, to: rowIndex };
+    fillRef.current = n;
+    setFill(n);
   };
 
   const fillEnd = () => {
@@ -357,31 +370,146 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
     fillRef.current = null;
     setFill(null);
     if (!f) return;
-    const start = Math.min(f.from, f.to);
-    const end = Math.max(f.from, f.to);
-    if (start === end) return;
+    const cols = cfg.current.columns;
+    const { src } = f;
+    const height = src.r2 - src.r1 + 1;
+    const down = f.to > src.r2;
+    const up = f.to < src.r1;
+    if (!down && !up) return;
     pushHistory();
     const next = [...rowsRef.current];
-    for (let i = start; i <= end; i++) {
-      while (next.length <= i) next.push(newRow(next.length));
-      next[i] = { ...next[i], [f.key]: f.value };
-      dirty.current.add(i);
+    const block = [];
+    for (let r = src.r1; r <= src.r2; r++) block.push(next[r] || {});
+
+    if (down) {
+      for (let r = src.r2 + 1; r <= f.to; r++) {
+        while (next.length <= r) next.push(newRow(next.length));
+        const source = block[(r - src.r1) % height];
+        const patch = {};
+        for (let c = src.c1; c <= src.c2; c++) if (cols[c]) patch[cols[c].key] = source[cols[c].key] ?? "";
+        next[r] = { ...next[r], ...patch };
+        dirty.current.add(r);
+      }
+      if (f.to >= next.length - 1) next.push(newRow(next.length));
+    } else {
+      for (let r = src.r1 - 1; r >= Math.max(0, f.to); r--) {
+        const offset = ((src.r1 - r) % height + height - 1) % height;
+        const source = block[height - 1 - offset];
+        const patch = {};
+        for (let c = src.c1; c <= src.c2; c++) if (cols[c]) patch[cols[c].key] = source[cols[c].key] ?? "";
+        next[r] = { ...next[r], ...patch };
+        dirty.current.add(r);
+      }
     }
-    if (end >= next.length - 1) next.push(newRow(next.length));
     commit(next);
     scheduleSave();
   };
 
   const isInFill = (idx, colIndex) => {
-    if (!fill || fill.col !== colIndex) return false;
-    return idx >= Math.min(fill.from, fill.to) && idx <= Math.max(fill.from, fill.to);
+    if (!fill) return false;
+    const { src, to } = fill;
+    if (colIndex < src.c1 || colIndex > src.c2) return false;
+    return idx >= Math.min(src.r1, to) && idx <= Math.max(src.r2, to);
   };
 
+  const upRef = useRef(null);
+  upRef.current = () => { selecting.current = false; stopAutoScroll(); fillEnd(); };
+
   useEffect(() => {
-    const up = () => { selecting.current = false; fillEnd(); };
+    const up = () => upRef.current?.();
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);
-  }); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- unlimited drag: auto-scroll + row index from pointer position ----
+  const scrollElRef = useRef(null);
+  const autoRef = useRef({ raf: 0, dy: 0, y: 0 });
+
+  const gridEl = () => scrollElRef.current || document.querySelector(".sheet-scroll");
+  const winRecalcRef = useRef(null);
+
+  const rowFromPointer = (clientY) => {
+    const el = gridEl();
+    if (!el) return null;
+    const head = el.querySelector("thead");
+    const headH = head ? head.offsetHeight : 0;
+    const box = el.getBoundingClientRect();
+    const y = clientY - box.top - headH + el.scrollTop;
+    const idx = Math.floor(y / 33);
+    if (idx < 0) return 0;
+    return idx;
+  };
+
+  const stopAutoScroll = () => {
+    if (autoRef.current.raf) cancelAnimationFrame(autoRef.current.raf);
+    autoRef.current.raf = 0;
+    autoRef.current.dy = 0;
+  };
+
+  const tickAutoScroll = () => {
+    const el = gridEl();
+    const a = autoRef.current;
+    if (!el || !a.dy || (!selecting.current && !fillRef.current)) { stopAutoScroll(); return; }
+    el.scrollTop += a.dy;
+    winRecalcRef.current?.();
+    const r = rowFromPointer(a.y);
+    if (r != null) {
+      if (fillRef.current) fillOver(r);
+      else if (selecting.current) extendTo(r, selRef.current?.c2 ?? 0);
+    }
+    a.raf = requestAnimationFrame(tickRef.current);
+  };
+  const tickRef = useRef(null);
+  tickRef.current = tickAutoScroll;
+
+  const moveRef = useRef(null);
+  moveRef.current = (e) => {
+    if (!selecting.current && !fillRef.current) return;
+    const el = gridEl();
+    if (!el) return;
+    const box = el.getBoundingClientRect();
+    const a = autoRef.current;
+    a.y = e.clientY;
+    // auto-scroll whenever the cursor reaches the last (or first) row visible in the viewport
+    const r = rowFromPointer(e.clientY);
+    const head = el.querySelector("thead");
+    const foot = el.querySelector("tfoot");
+    const headH = head ? head.offsetHeight : 0;
+    const footH = foot ? foot.offsetHeight : 0;
+    const usable = Math.max(3 * 33, el.clientHeight - headH - footH);
+    const firstVisible = Math.floor(el.scrollTop / 33);
+    const lastVisible = Math.floor((el.scrollTop + usable) / 33) - 1;
+    const pastBottom = e.clientY > Math.min(box.bottom, window.innerHeight) - 6;
+    if (r >= lastVisible - 1 || pastBottom) a.dy = 28;
+    else if (r <= firstVisible + 1 && el.scrollTop > 0) a.dy = -28;
+    else a.dy = 0;
+    if (a.dy && !a.raf) a.raf = requestAnimationFrame(tickRef.current);
+    if (!a.dy) stopAutoScroll();
+    // keep tracking the row under the cursor even where rows are not mounted yet
+    if (r != null) {
+      if (fillRef.current) fillOver(r);
+      else if (selecting.current) extendTo(r, selRef.current?.c2 ?? 0);
+    }
+  };
+
+  // registered once: re-registering per render would cancel the auto-scroll loop
+  useEffect(() => {
+    const h = (e) => moveRef.current?.(e);
+    window.addEventListener("mousemove", h);
+    return () => { window.removeEventListener("mousemove", h); stopAutoScroll(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const lastDataRow = () => {
+    const rws = rowsRef.current;
+    for (let i = rws.length - 1; i >= 0; i--) if (!isBlank(rws[i])) return i;
+    return 0;
+  };
+
+  const selectAll = () => {
+    const s = { r1: 0, c1: 0, r2: lastDataRow(), c2: cfg.current.columns.length - 1 };
+    selRef.current = s;
+    setSel(s);
+  };
 
   useEffect(() => {
     const handler = (e) => {
@@ -389,9 +517,38 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
       const b = selBounds();
       const multi = b && (b.r1 !== b.r2 || b.c1 !== b.c2);
       const key = e.key.toLowerCase();
-      if (key === "c" && multi) { e.preventDefault(); copySelection(); }
+      if (e.shiftKey && ["arrowdown", "arrowup", "arrowright", "arrowleft"].includes(key)) {
+        if (!b) return;
+        e.preventDefault();
+        const s = selRef.current;
+        const to = {
+          arrowdown: { r2: lastDataRow(), c2: s.c2 },
+          arrowup: { r2: 0, c2: s.c2 },
+          arrowright: { r2: s.r2, c2: cfg.current.columns.length - 1 },
+          arrowleft: { r2: s.r2, c2: 0 },
+        }[key];
+        const n = { ...s, ...to };
+        selRef.current = n;
+        setSel(n);
+        return;
+      }
+      if (key === "a") { e.preventDefault(); selectAll(); }
+      else if (key === "d" && b) { e.preventDefault(); fillDownSelection(); }
+      else if (key === "c" && multi) { e.preventDefault(); copySelection(); }
       else if (key === "x" && multi) { e.preventDefault(); cutSelection(); }
       else if (key === "v" && multi) { e.preventDefault(); pasteSelection(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== "Delete") return;
+      const b = selBounds();
+      if (!b || (b.r1 === b.r2 && b.c1 === b.c2)) return;
+      e.preventDefault();
+      clearSelection();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -472,6 +629,16 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
     filterCount: activeCount(filters) + (search.trim() ? 1 : 0),
     status, flush, deleteRow, refresh, inputs,
     setEnsureVisible: (fn) => { ensureRef.current = fn; },
+    setScrollEl: (el) => { scrollElRef.current = el; },
+    setWindowRecalc: (fn) => { winRecalcRef.current = fn; },
+    selectAll,
+    selInfo: (() => {
+      const s = sel;
+      if (!s) return null;
+      const rows_ = Math.abs(s.r2 - s.r1) + 1;
+      const cols_ = Math.abs(s.c2 - s.c1) + 1;
+      return { rows: rows_, cols: cols_, cells: rows_ * cols_ };
+    })(),
     undo, redo, canUndo: histSize.past > 0, canRedo: histSize.future > 0,
     fillStart, fillOver, isInFill,
     selectStart, selectOver, isSelected, hasSelection: !!(sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2)),

@@ -61,6 +61,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 Balance Stock also subtracts **Shop Sales** (`shop_sale_rows`, matched on Group+Item+Shade; each row now carries `shop_sold_qty`). Final formula: stock + pending with company − conference order − shop sales.
 
+- 2026-06 **Excel-grade grid** (`lib/useSheet.js`): fill handle now drags a whole selected block (multi-column, pattern repeats, works up or down) with **auto-scroll** past the viewport (`rowFromPointer` + rAF `tickAutoScroll`, pointer-to-row maths at 33px, triggers within 2 rows of the last visible row); `applyMatrix` repeats a copied block across a bigger target range and creates rows as needed; shortcuts Ctrl+A (select used range), Ctrl+Shift+Arrow (extend to last filled row/column), Ctrl+D (fill down), Delete (clear range), Shift+Click; live **selection counter** (`<prefix>sel-count`). `useWindowRows.recompute` now cancels + reschedules its rAF, which fixed a blank grid after programmatic scrolling. Verified: iteration_15 (10/10 flows, 0 JS errors, undo reverts big fills).
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

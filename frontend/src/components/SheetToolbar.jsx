@@ -62,6 +62,14 @@ export const SheetToolbar = ({ sheet, prefix = "" }) => (
       <ClipboardPaste className="h-4 w-4 mr-1" /> PASTE
     </Button>
     <span
+      data-testid={`${prefix}sel-count`}
+      className="text-[10px] mono px-2 py-1.5 rounded-md border border-border text-muted-foreground whitespace-nowrap"
+    >
+      {sheet.selInfo && sheet.selInfo.cells > 1
+        ? `${sheet.selInfo.cells.toLocaleString("en-IN")} CELLS (${sheet.selInfo.rows}R × ${sheet.selInfo.cols}C)`
+        : "NO SELECTION"}
+    </span>
+    <span
       data-testid={`${prefix}save-status`}
       className={`flex items-center gap-1.5 text-xs tracking-wide px-2 py-1.5 rounded-md border ${
         sheet.status === "error"

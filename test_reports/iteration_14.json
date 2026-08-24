@@ -1,0 +1,57 @@
+{
+  "summary": "Iteration 14 - verified Balance Stock formula, Extra Stock backend + UI, and Company Balance PENDING ONLY / SHOWING ALL toggle. Backend: 91/91 pytest passing (added 21 new tests in test_extra_stock.py, single-threaded run 110s). Frontend: /extra-stock loads via rail-stock -> tab-extra-stock, stat strip + rows + xlsx/pdf downloads + search + refresh all work; /company-balance defaults to PENDING ONLY hiding fully-arrived rows, toggle flips to SHOWING ALL and back, typing into a visible pending row edits the CORRECT underlying record (verified via API) and persists after reload, hidden fully-arrived row is NOT touched, Ctrl+Z (undo) does NOT wipe hidden fully-arrived rows. Regression: /, /orders, /stock, /shop-sale, /company-order, /summary, /balance all load 200.",
+  "backend_pytest": {
+    "command": "pytest backend/tests/ -o addopts=\"\" -q --junitxml=/app/test_reports/pytest/iter14_all.xml",
+    "result": "91 passed in 109.99s",
+    "new_test_file": "/app/backend/tests/test_extra_stock.py",
+    "new_tests": [
+      "TestBalanceStockFormula::test_full_formula_with_pending_and_shop_sales",
+      "TestBalanceStockFormula::test_pending_never_negative",
+      "TestExtraStock::test_shape_and_totals_reconcile",
+      "TestExtraStock::test_only_lines_where_arrived_gt_sent_appear",
+      "TestExtraStockExports::test_xlsx_headers_and_total_row",
+      "TestExtraStockExports::test_pdf_valid",
+      "TestRegressionEndpoints::test_endpoint_ok[15 endpoints]"
+    ],
+    "controlled_example_proven": "stock=20 + pending(sent 30 - arrived 10)=20 - ordered=12 - shop_sold=3 => balance = 25 (asserted exactly)"
+  },
+  "frontend_ui_checks": {
+    "rail_stock_to_tab_extra_stock": true,
+    "extra_stock_page_loaded": true,
+    "extra_stat_lines_after_seed": 1,
+    "extra_row_qa_ui_extra_cells": ["QA_UI_G","QA_UI_EXTRA","E1","4","10","6"],
+    "extra_search_filters_to_1": true,
+    "extra_export_xlsx_downloaded": "extra-stock.xlsx",
+    "extra_export_pdf_downloaded": "extra-stock.pdf",
+    "cb_default_button_text": "PENDING ONLY",
+    "cb_pending_only_hides_fully_arrived": true,
+    "cb_pending_only_hides_arrived_gt_sent": true,
+    "cb_show_all_reveals_all_three": ["QA_UI_EXTRA","QA_UI_ARRIVED_FULL","QA_UI_PENDING"],
+    "cb_edit_in_pending_only_hits_correct_underlying_row": true,
+    "cb_edit_persists_after_reload": true,
+    "cb_undo_does_not_wipe_hidden_fully_arrived_row": true,
+    "regression_routes_all_200": ["/", "/orders", "/stock", "/shop-sale", "/company-order", "/summary", "/balance"]
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_extra_stock.py",
+    "/app/test_reports/pytest/iter14_all.xml",
+    "/app/test_reports/pytest/iter14_extra_stock.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py balance_stock() ordering: `entry()` is called for stock first, then orders, but pending/shop_sold aggregation uses _norm(...) which is UPPER while entry() key uses item.strip().upper() - identical, OK. Verified with mixed-case items in the formula test.",
+    "extra_stock_rows() ignores rows where item is blank (correct); arrived-only rows with no matching sent still surface as extra (arrived_qty - 0 > 0). This matches the spec 'Arrived - Sent per Group+Item+Shade where positive'. Consider documenting the arrived-only-with-empty-sent case in the page subtitle.",
+    "LineSheet.jsx `visible` slice preserves the original `idx` per row so hidden rows keep their absolute position; setCell/deleteRow/paste all use that idx. Empirically verified: editing in pending-only view edited the right record and Ctrl+Z undo did not remove the hidden fully-arrived row.",
+    "CompanyBalanceOrder.jsx recomputes `map` on every render (Object.fromEntries over ~685 rows) and the memoized `visibleFilter` depends on `map` via eslint-disable — safe today because `balance` state change triggers re-render, but any future change to `map` construction must keep this invariant.",
+    "ExtraStock.jsx uses `${r.group}-${r.item}-${r.shade}` as React key. Fine given the endpoint dedupes by that key; still, if two rows collide on a rarely-blank shade the console will warn. Consider joining with a delimiter that can't appear in item (e.g. `\\u0001`)."
+  ],
+  "updated_files": ["/app/backend/tests/test_extra_stock.py"],
+  "success_rate": {"backend": "100% (91/91)", "frontend": "100% (all flows in the request pass)"},
+  "seed_data_creation": "Three transient QA_UI_ line-sheet rows were created via API during UI testing (QA_UI_EXTRA sent+arrived, QA_UI_ARRIVED_FULL sent+arrived, QA_UI_PENDING sent) and deleted at teardown (CLEANUP: 5). The autouse fixture in test_extra_stock.py also purges any QA_XS_ leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Extra Stock testids: extra-stock-page, extra-grid, extra-row-N, extra-cell-N-<key>, extra-stat-lines/qty/arrived/sent, extra-total-sent/arrived/extra, extra-global-search, extra-clear-filters-btn, extra-export-excel-btn, extra-export-pdf-btn, refresh-extra-btn. Company Balance toggle: cb-show-all-btn; visibleFilter is in CompanyBalanceOrder.jsx and hides rows where computed balance <= 0. Backend pytest MUST be run with -o addopts=\"\" for single-threaded (pytest.ini defaults to -n 2 --dist loadscope which races on shared data). New backend test file: /app/backend/tests/test_extra_stock.py.",
+  "rca of the issue": "N/A - no bugs found in iteration 14."
+}

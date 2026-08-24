@@ -736,6 +736,138 @@ async def balance_stock():
     }
 
 
+async def extra_stock_rows():
+    """Arrived from the company beyond what was sent/ordered = extra stock."""
+    sent = await db.company_sent_rows.find().to_list(20000)
+    arrived = await db.company_arrived_rows.find().to_list(20000)
+    agg = {}
+
+    def entry(r):
+        k = (_norm(r.get("group")), _norm(r.get("item")), str(r.get("shade", "")).strip())
+        return agg.setdefault(k, {
+            "group": str(r.get("group", "")).strip(), "item": str(r.get("item", "")).strip(),
+            "shade": str(r.get("shade", "")).strip(), "sent_qty": 0, "arrived_qty": 0, "last_date": "",
+        })
+
+    for r in sent:
+        if not str(r.get("item", "")).strip():
+            continue
+        entry(r)["sent_qty"] += r.get("quantity") or 0
+    for r in arrived:
+        if not str(r.get("item", "")).strip():
+            continue
+        e = entry(r)
+        e["arrived_qty"] += r.get("quantity") or 0
+        d = str(r.get("date", "")).strip()
+        if d > e["last_date"]:
+            e["last_date"] = d
+
+    out = []
+    for e in agg.values():
+        extra = e["arrived_qty"] - e["sent_qty"]
+        if extra > 0:
+            out.append({**e, "extra_qty": extra})
+    out.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
+    return out
+
+
+@api_router.get("/extra-stock")
+async def extra_stock():
+    rows = await extra_stock_rows()
+    return {
+        "rows": rows,
+        "total_lines": len(rows),
+        "total_sent": sum(r["sent_qty"] for r in rows),
+        "total_arrived": sum(r["arrived_qty"] for r in rows),
+        "total_extra": sum(r["extra_qty"] for r in rows),
+    }
+
+
+@api_router.get("/extra-stock/export.xlsx")
+async def extra_stock_xlsx():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    rows = await extra_stock_rows()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Extra Stock"
+    ws.append(["EXTRA STOCK (ARRIVED MORE THAN SENT)"])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([f"Generated {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M UTC')}"])
+    ws.append([])
+    headers = ["SR", "GROUP NAME", "ITEM NAME", "SHADE", "SENT QTY", "ARRIVED QTY", "EXTRA QTY"]
+    ws.append(headers)
+    head_row = ws.max_row
+    for c in range(1, len(headers) + 1):
+        cell = ws.cell(row=head_row, column=c)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="3F6F52")
+        cell.alignment = Alignment(horizontal="center")
+    for i, r in enumerate(rows, start=1):
+        ws.append([i, r["group"], r["item"], r["shade"], r["sent_qty"], r["arrived_qty"], r["extra_qty"]])
+    total_row = ws.max_row + 1
+    ws.cell(row=total_row, column=4, value="TOTAL").font = Font(bold=True)
+    for col, key in ((5, "sent_qty"), (6, "arrived_qty"), (7, "extra_qty")):
+        ws.cell(row=total_row, column=col, value=sum(r[key] for r in rows)).font = Font(bold=True)
+    for col, width in zip("ABCDEFG", (6, 22, 32, 12, 14, 14, 14)):
+        ws.column_dimensions[col].width = width
+    ws.freeze_panes = ws.cell(row=head_row + 1, column=1)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="extra-stock.xlsx"'},
+    )
+
+
+@api_router.get("/extra-stock/export.pdf")
+async def extra_stock_pdf():
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    rows = await extra_stock_rows()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm,
+                            leftMargin=12 * mm, rightMargin=12 * mm, title="Extra Stock")
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph("<b>EXTRA STOCK</b>", styles["Title"]),
+        Paragraph(f"Arrived more than sent · generated {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M UTC')}", styles["Normal"]),
+        Spacer(1, 6 * mm),
+    ]
+    data = [["SR", "GROUP NAME", "ITEM NAME", "SHADE", "EXTRA QTY"]]
+    for i, r in enumerate(rows, start=1):
+        data.append([str(i), r["group"], r["item"], r["shade"], f'{r["extra_qty"]:g}'])
+    data.append(["", "", "", "TOTAL", f'{sum(r["extra_qty"] for r in rows):g}'])
+    table = Table(data, repeatRows=1, colWidths=[12 * mm, 42 * mm, 68 * mm, 30 * mm, 34 * mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3F6F52")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (4, 0), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F4F7FA")]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(table)
+    doc.build(story)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="extra-stock.pdf"'},
+    )
+
+
 # ---------- Dashboard ----------
 @api_router.get("/stats/dashboard")
 async def dashboard_stats():

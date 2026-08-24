@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Factory, PackageCheck, ClipboardList, Users, Store, Sun, Moon, Menu, X } from "lucide-react";
+import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Factory, PackageCheck, PackagePlus, ClipboardList, Users, Store, Sun, Moon, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "../context/RoleContext";
 import { useTheme } from "../context/ThemeContext";
@@ -33,6 +33,7 @@ export const SECTIONS = [
       { to: "/company-balance", label: "Company Balance Order", id: "company-balance" },
       { to: "/stock-arrived", label: "Stock Arrived", id: "stock-arrived" },
       { to: "/balance", label: "Balance Stock", id: "balance" },
+      { to: "/extra-stock", label: "Extra Stock", id: "extra-stock" },
     ],
   },
   {
@@ -45,7 +46,7 @@ export const SECTIONS = [
 
 const TAB_ICON = {
   dashboard: LayoutDashboard, orders: Table2, stock: Boxes, summary: ListTree, balance: Scale,
-  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users, shop: Store, "shop-sale": Store,
+  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users, shop: Store, "shop-sale": Store, "extra-stock": PackagePlus,
 };
 
 export const Shell = () => {
@@ -176,7 +177,7 @@ export const Shell = () => {
           </div>
         )}
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-hidden bg-[hsl(var(--shell-bg))] p-2">
+        <main className="flex-1 min-w-0 min-h-0 overflow-hidden bg-[hsl(var(--shell-bg))] p-2 flex flex-col">
           <Outlet />
         </main>
       </div>

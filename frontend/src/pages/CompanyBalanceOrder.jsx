@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { LineSheet } from "../components/LineSheet";
 import { StatStrip } from "../components/SheetFrame";
+import { Button } from "../components/ui/button";
 
 const extraColumns = [
   { key: "arrived_qty", label: "Arrived", width: 110 },
@@ -10,6 +11,7 @@ const extraColumns = [
 
 export default function CompanyBalanceOrder() {
   const [balance, setBalance] = useState({ rows: [], total_sent: 0, total_arrived: 0, total_balance: 0, pending_lines: 0 });
+  const [showAll, setShowAll] = useState(false);
 
   const loadBalance = useCallback(() => api.companyBalance().then(setBalance).catch(() => {}), []);
   useEffect(() => { loadBalance(); }, [loadBalance]);
@@ -26,16 +28,30 @@ export default function CompanyBalanceOrder() {
     return hit[key];
   };
 
+  // only lines still awaited from the company (blank rows stay so new orders can be typed)
+  const visibleFilter = useMemo(() => (row) => {
+    if (showAll) return true;
+    if (!String(row.item || "").trim()) return true;
+    return Number(extraValue(row, "balance_qty")) > 0;
+  }, [showAll, map]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <LineSheet
       sheetKey="company-sent-rows"
       prefix="cb-"
       title="Company Balance Order"
-      subtitle="Every order sent to the company stays in balance until the same Group + Item + Shade is entered in Stock Arrived"
+      subtitle={showAll ? "Every order sent to the company" : "Only orders still pending to arrive from the company"}
       headerColor="#0A2540"
       extraColumns={extraColumns}
       extraValue={extraValue}
+      visibleFilter={visibleFilter}
       onSaved={loadBalance}
+      toolbarExtras={
+        <Button variant={showAll ? "default" : "outline"} size="sm" className="h-8 text-[10px]"
+          data-testid="cb-show-all-btn" onClick={() => setShowAll((s) => !s)}>
+          {showAll ? "SHOWING ALL" : "PENDING ONLY"}
+        </Button>
+      }
       stats={
         <StatStrip
           items={[
