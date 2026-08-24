@@ -13,6 +13,7 @@ import CompanyOrder from "@/pages/CompanyOrder";
 import CompanyBalanceOrder from "@/pages/CompanyBalanceOrder";
 import StockArrived from "@/pages/StockArrived";
 import Parties from "@/pages/Parties";
+import Shop from "@/pages/Shop";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
             <Route path="/stock-arrived" element={<StockArrived />} />
             <Route path="/balance" element={<BalanceStock />} />
             <Route path="/parties" element={<Parties />} />
+            <Route path="/shop" element={<Shop />} />
           </Route>
         </Routes>
       </BrowserRouter>

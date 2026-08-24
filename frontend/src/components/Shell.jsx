@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Factory, PackageCheck, ClipboardList, Users, Sun, Moon, Menu, X } from "lucide-react";
+import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Factory, PackageCheck, ClipboardList, Users, Store, Sun, Moon, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "../context/RoleContext";
 import { useTheme } from "../context/ThemeContext";
@@ -35,11 +35,17 @@ export const SECTIONS = [
       { to: "/balance", label: "Balance Stock", id: "balance" },
     ],
   },
+  {
+    id: "shop",
+    label: "Shop",
+    icon: Store,
+    tabs: [{ to: "/shop", label: "Shop", id: "shop" }],
+  },
 ];
 
 const TAB_ICON = {
   dashboard: LayoutDashboard, orders: Table2, stock: Boxes, summary: ListTree, balance: Scale,
-  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users,
+  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users, shop: Store,
 };
 
 export const Shell = () => {
