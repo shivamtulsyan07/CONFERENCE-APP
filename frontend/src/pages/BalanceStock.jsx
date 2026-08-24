@@ -50,7 +50,7 @@ export default function BalanceStock() {
         <div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Balance Stock</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Stock sheet quantity minus order sheet quantity, matched on Item + Shade · red means short
+            Stock sheet quantity minus conference order quantity, matched on Item + Shade · red means short
           </p>
         </div>
         <div className="flex gap-2">

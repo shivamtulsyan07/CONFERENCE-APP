@@ -36,7 +36,7 @@ export default function Dashboard() {
       <PageHeader
         testId="dashboard-page"
         title="Operations Dashboard"
-        subtitle="Order sheet, stock readiness and party-wise dispatch position"
+        subtitle="Conference order, stock readiness and party-wise dispatch position"
         action={<Button variant="outline" data-testid="seed-btn" onClick={seed}>Load sample data</Button>}
       />
 

@@ -37,7 +37,7 @@ export default function Parties() {
       <PageHeader
         testId="parties-page"
         title="Party Master"
-        subtitle="Names and page numbers used by the Order Sheet dropdowns"
+        subtitle="Names and page numbers used by the Conference Order dropdowns"
         action={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button data-testid="add-party-btn">Add party</Button></DialogTrigger>

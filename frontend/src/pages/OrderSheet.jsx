@@ -89,7 +89,7 @@ export default function OrderSheet() {
     <div data-testid="order-sheet-page">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Order Sheet</h1>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Order</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the SR number to change row colour
           </p>
