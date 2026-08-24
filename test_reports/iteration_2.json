@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 2 rebuilt the backend test suite for the new Excel-like Order Sheet / Stock Sheet model (old form-based orders/PO/dispatch endpoints are gone). 12/12 pytest cases pass covering seed idempotency, parties CRUD, lookups (party->page map), order-rows bulk insert with amount auto-calc, blank-row skipping, update-by-id (no duplicates), delete, auto-status vs stock, stock-rows bulk+delete, dashboard shape. Frontend Playwright verified end-to-end: OrderSheet grid columns/testids, party->page auto-fill (SRI RAM VASTRALAYA, BHELAHI -> 36), qty*rate=amount, save + reload persistence, status-toggle color cycle (white->yellow), column filter, Enter/Tab/ArrowUp keyboard nav, delete row, auto-status button, legend. StockSheet paste (multi-line TSV via ClipboardEvent) creates two rows in one paste, save+reload persists, filters work, mobile 390px renders grid and mobile-nav toggle. Dashboard stats/panels render with real counts; seed idempotent info toast; Parties add + admin-only delete + staff hides delete verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/order-rows/bulk", "issue": "amount auto-fill only fires when incoming amount==0. If frontend sends a pre-computed amount that is wrong, backend never recomputes. Frontend does compute it, so functionally fine, but a defensive server-side recompute (qty*rate) would be safer."},
+      {"endpoint": "POST /api/order-rows/auto-status", "issue": "Aggregates stock by (item_upper, shade_str) but does not deduct already-committed order qty across rows, so if two rows both need the same shade, both may be marked 'ready' even though total demand exceeds stock. Design choice, worth confirming with product."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recharts prints width(-1)/height(-1) warning on first paint before container measures; cosmetic."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Consider defensive server-side amount recompute and confirming auto-status behaviour when multiple rows contend for the same stock line."
+  ],
+  "critical_code_review_comments": [
+    "useSheet.applyPatch appends a new empty row whenever the edited idx is >= next.length-1. Combined with the pasted-block auto-append, this can leave 2 blank trailing rows after a paste (see: matrix loop also pushes rows). Not a bug, but worth simplifying so exactly one trailing blank remains.",
+    "auto-status endpoint does not consider order row demand vs total supply across multiple order rows sharing the same item+shade (see minor issue above).",
+    "server.py bulk endpoints re-serialize the entire collection on every save (returns list_order_rows()). Fine at current volume, but O(N) I/O per save; consider returning only the changed rows for scalability.",
+    "STATUS enum uses Literal but the DB layer accepts any string via r.get('status', 'not_ready') in dashboard/auto_status; a bad legacy value would slip through until Pydantic validates on GET (from_mongo). Consider a data migration or validation guard.",
+    "Frontend OrderSheet.jsx handleSave calls sheet.persist() and then api.lookups() concurrently; race is harmless but if a new party name was just entered the datalist may lag one tick. Cosmetic."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (fully rewritten for order_rows/stock_rows/lookups/dashboard endpoints; loads REACT_APP_BACKEND_URL from frontend/.env)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% of executed flows"},
+  "test_credentials": "N/A - no auth in app",
+  "seed_data_creation": "Used POST /api/seed (idempotent): 3 parties + 11 order rows + 8 stock rows. Playwright added and cleaned up PW_TEST_PARTY_UI. Backend tests use TEST_ / PW_ prefixes and clean up after themselves.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Endpoints under test: /api/parties (GET/POST/DELETE), /api/order-rows (GET), /api/order-rows/bulk (POST upsert; blank rows dropped; amount auto-calc if 0), /api/order-rows/{id} (DELETE), /api/order-rows/auto-status (POST), /api/stock-rows (same shape), /api/lookups, /api/stats/dashboard, /api/seed (idempotent). Frontend routes: /, /orders, /stock, /parties. Key testids: order-sheet-page, stock-sheet-page, cell-<r>-<key>, stock-cell-<r>-<key>, filter-<key>, stock-filter-<key>, status-toggle-<r>, delete-row-<r>, stock-delete-row-<r>, save-sheet-btn, save-stock-sheet-btn, auto-status-btn, seed-btn, role-admin/role-staff, mobile-nav, menu-toggle, party-*-input. Grid engine lives in /app/frontend/src/lib/useSheet.js — keyboard nav, ClipboardEvent-based paste, dirty tracking. The old backend_test.py from iteration 1 targeted removed endpoints and has been replaced.",
+  "rca of the issue": "No new bugs found in this iteration; the previously reported _id serialization fix from iteration 1 still holds (verified via test_list_returns_id_not_underscore)."
+}

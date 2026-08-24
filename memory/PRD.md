@@ -1,27 +1,27 @@
-# Conference Ops — Order & Dispatch Module
+# Conference Ops — Excel-like Order & Stock Module
 
 ## Problem statement
-"I want you to create a module for my conference working where we take order from customer and work on dispatching order to the company and stock from shop."
+Module to take orders from customers, order from the company, and dispatch party-wise. User then requested an **Excel-like sheet** working, sharing two screenshots (order register + stock entry sheet).
 
-User choices: order flow = give order to company → receive → dispatch party-wise; staff + admin roles (no login, header role toggle); automatic stock deduction on shop fulfilment; dashboard with sales & dispatch stats; keep minimal.
+## User choices
+- Order grid columns: Party Name, Page, Group, ITEM, SHADE, QTY, MTR, BILL NO + Rate/Amount
+- Row colours: YELLOW = stock has arrived, GREEN = in stock ready, WHITE = stock not ready
+- Stock sheet keyed by Item + Shade (each combination is its own line)
+- Grid behaviour: cell typing, Tab/Enter nav, auto new row, dropdowns for Party/Group/Item, Excel copy-paste, column filters
+- Grids REPLACE earlier form-based Orders/Stock pages; staff + admin role toggle, no login
 
 ## Architecture
-- Backend: FastAPI + Motor/MongoDB. Collections: `parties`, `products`, `orders`, `company_orders`, `dispatches`. All routes under `/api`.
-- Frontend: React (CRA) + Tailwind + shadcn/ui + recharts. Sidebar shell, pages: Dashboard, Customer Orders, Company Orders, Dispatch, Shop Stock, Parties.
-- Role state in localStorage via RoleContext (no auth).
+- Backend FastAPI + MongoDB. Collections: `parties`, `order_rows`, `stock_rows`.
+  Endpoints: /api/parties, /api/order-rows (+/bulk upsert, /auto-status, DELETE), /api/stock-rows (+/bulk, DELETE), /api/lookups, /api/stats/dashboard, /api/seed.
+- Frontend React + Tailwind. Grid engine `src/lib/useSheet.js` (keyboard nav, clipboard TSV paste, dirty tracking, bulk save), cell renderer `components/SheetCell.jsx` with datalist dropdowns.
+- Pages: Dashboard, Order Sheet (/orders), Stock Entry (/stock), Party Master (/parties).
 
-## Core flow
-Customer order (pending) → Company PO (order → ordered_to_company) → Receive goods (stock IN, order → received) → Party-wise dispatch (stock OUT, order → partial/dispatched).
-
-## Implemented (2026-06)
-- Parties CRUD, Products CRUD + manual stock adjust
-- Multi-line customer orders with running total, company/shop source per line
-- Company POs linked to pending customer orders; partial & full goods receipt increments shop stock
-- Party-wise dispatch with stock and pending-qty validation, auto stock deduction, dispatch history
-- Dashboard: sales, orders, pending dispatch, stock units, party-wise dispatch chart, order value trend, low-stock panel, recent dispatches
-- Seed endpoint for sample data
+## Implemented
+- 2026-06 v1: form-based orders → company PO → receive → party-wise dispatch with auto stock deduction (now replaced).
+- 2026-06 v2: Excel-like Order Sheet and Stock Entry sheets, colour statuses (click row number to cycle), "Auto colour from stock" matching Item+Shade against stock, footer totals, per-column filters, party→page auto-fill, Excel paste, dashboard rebuilt on sheet data (qty, value, billed/unbilled, readiness counts, party-wise stacked chart, top items).
 
 ## Backlog
-- P1: Invoice / dispatch challan PDF; order detail page with timeline
-- P1: Unique document numbering via counters collection (current count-based numbering not concurrency-safe)
-- P2: Real auth + per-user audit trail; date-range filters and CSV export; payments/outstanding tracking
+- P1: Bill-wise view / print of a party's sheet; export to Excel/CSV
+- P1: auto-status should net off demand across rows sharing the same Item+Shade
+- P2: undo/redo, multi-cell selection & fill-down, row grouping by party
+- P2: real auth + audit trail of who edited which cell

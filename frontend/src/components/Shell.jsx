@@ -1,23 +1,13 @@
 import { NavLink, Outlet } from "react-router-dom";
-import {
-  LayoutDashboard,
-  ClipboardList,
-  Factory,
-  Truck,
-  Boxes,
-  Users,
-  Menu,
-} from "lucide-react";
+import { LayoutDashboard, Table2, Boxes, Users, Menu } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "../context/RoleContext";
 import { Button } from "./ui/button";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
-  { to: "/orders", label: "Customer Orders", icon: ClipboardList, id: "orders" },
-  { to: "/company-orders", label: "Company Orders", icon: Factory, id: "company-orders" },
-  { to: "/dispatch", label: "Dispatch", icon: Truck, id: "dispatch" },
-  { to: "/inventory", label: "Shop Stock", icon: Boxes, id: "inventory" },
+  { to: "/orders", label: "Order Sheet", icon: Table2, id: "orders" },
+  { to: "/stock", label: "Stock Entry", icon: Boxes, id: "stock" },
   { to: "/parties", label: "Parties", icon: Users, id: "parties" },
 ];
 

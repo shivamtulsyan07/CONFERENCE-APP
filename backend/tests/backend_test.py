@@ -1,218 +1,209 @@
-"""Backend integration tests for Conference Order/Dispatch app."""
+"""Backend tests for the Order Sheet / Stock Sheet Excel-like app (iteration 2)."""
 import os
 import pytest
 import requests
+from pathlib import Path
+from dotenv import load_dotenv
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://order-dispatch-hub-31.preview.emergentagent.com").rstrip("/")
+load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
+BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
 
 @pytest.fixture(scope="session")
 def s():
-    return requests.Session()
+    sess = requests.Session()
+    sess.headers.update({"Content-Type": "application/json"})
+    return sess
 
 
-@pytest.fixture(scope="session")
-def seeded(s):
+# ---------- seed ----------
+@pytest.fixture(scope="session", autouse=True)
+def _seed(s):
     r = s.post(f"{API}/seed")
     assert r.status_code == 200
     return r.json()
 
 
-# ---------- Seed ----------
 class TestSeed:
-    def test_seed_idempotent(self, s, seeded):
-        # second call should say already present
+    def test_seed_idempotent(self, s):
         r = s.post(f"{API}/seed")
         assert r.status_code == 200
         data = r.json()
         assert data.get("seeded") is False
         assert "already" in data.get("message", "").lower()
 
-    def test_parties_and_products_exist(self, s, seeded):
+
+# ---------- Parties ----------
+class TestParties:
+    def test_seeded_parties(self, s):
         parties = s.get(f"{API}/parties").json()
-        products = s.get(f"{API}/products").json()
-        assert len(parties) >= 3
-        assert len(products) >= 4
+        names = {p["name"] for p in parties}
+        assert "SRI RAM VASTRALAYA, BHELAHI" in names
+        assert "CHAUDHARY VASTRALAYA, DARDHA" in names
+        # verify id field (not _id)
+        for p in parties:
+            assert "id" in p and "_id" not in p
+
+    def test_create_and_delete_party(self, s):
+        r = s.post(f"{API}/parties", json={"name": "TEST_PARTY_X", "page": "99"})
+        assert r.status_code == 200
+        pid = r.json()["id"]
+        assert r.json()["page"] == "99"
+        # verify in list
+        assert any(p["id"] == pid for p in s.get(f"{API}/parties").json())
+        r = s.delete(f"{API}/parties/{pid}")
+        assert r.status_code == 200
+
+
+# ---------- Lookups ----------
+class TestLookups:
+    def test_lookups_shape_and_party_pages(self, s):
+        r = s.get(f"{API}/lookups")
+        assert r.status_code == 200
+        lk = r.json()
+        for k in ["parties", "party_pages", "groups", "items", "shades", "bill_nos"]:
+            assert k in lk
+        assert lk["party_pages"].get("SRI RAM VASTRALAYA, BHELAHI") == "36"
+        assert lk["party_pages"].get("CHAUDHARY VASTRALAYA, DARDHA") == "60"
+        assert "SH ROLL" in lk["groups"]
+
+
+# ---------- Order rows bulk / persistence / update / delete ----------
+class TestOrderRows:
+    def test_list_returns_id_not_underscore(self, s):
+        rows = s.get(f"{API}/order-rows").json()
+        assert len(rows) > 0
+        for r in rows[:3]:
+            assert "id" in r and "_id" not in r
+
+    def test_bulk_insert_and_persistence(self, s):
+        payload = {"rows": [
+            {"party_name": "TEST_BULK_A", "page": "1", "group": "SH ROLL",
+             "item": "TEST_ITEM_A", "shade": "111", "qty": 2, "rate": 100,
+             "bill_no": "TB/1", "status": "not_ready", "row_index": 900}
+        ]}
+        r = s.post(f"{API}/order-rows/bulk", json=payload)
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        created = [x for x in rows if x["party_name"] == "TEST_BULK_A"]
+        assert len(created) == 1
+        row = created[0]
+        # amount auto-fill
+        assert row["amount"] == 200
+        assert row["qty"] == 2
+
+        # verify GET persistence
+        rows2 = s.get(f"{API}/order-rows").json()
+        assert any(x["id"] == row["id"] for x in rows2)
+
+        # cleanup
+        s.delete(f"{API}/order-rows/{row['id']}")
+
+    def test_blank_rows_skipped(self, s):
+        before = len(s.get(f"{API}/order-rows").json())
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "", "item": "", "shade": "", "qty": 0, "rate": 0, "bill_no": ""},
+            {"party_name": "  ", "item": " ", "shade": "", "qty": 0, "rate": 0, "bill_no": ""},
+        ]})
+        assert r.status_code == 200
+        after = len(s.get(f"{API}/order-rows").json())
+        assert before == after
+
+    def test_update_existing_row_no_duplicate(self, s):
+        # create one
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "TEST_UPD", "item": "UPD_ITEM", "shade": "1", "qty": 1, "rate": 10, "bill_no": ""}
+        ]})
+        rid = [x for x in r.json() if x["party_name"] == "TEST_UPD"][0]["id"]
+        before_count = len(s.get(f"{API}/order-rows").json())
+
+        # update it with id
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"id": rid, "party_name": "TEST_UPD", "item": "UPD_ITEM", "shade": "1",
+             "qty": 5, "rate": 10, "bill_no": "B/9", "status": "ready"}
+        ]})
+        assert r.status_code == 200
+        after_count = len(s.get(f"{API}/order-rows").json())
+        assert before_count == after_count  # no dup
+
+        # verify GET updated data
+        updated = [x for x in s.get(f"{API}/order-rows").json() if x["id"] == rid][0]
+        assert updated["qty"] == 5
+        assert updated["bill_no"] == "B/9"
+        assert updated["status"] == "ready"
+
+        s.delete(f"{API}/order-rows/{rid}")
+
+    def test_delete_row(self, s):
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "TEST_DEL", "item": "X", "shade": "1", "qty": 1, "rate": 1, "bill_no": ""}
+        ]})
+        rid = [x for x in r.json() if x["party_name"] == "TEST_DEL"][0]["id"]
+        r = s.delete(f"{API}/order-rows/{rid}")
+        assert r.status_code == 200
+        assert not any(x["id"] == rid for x in s.get(f"{API}/order-rows").json())
+
+
+# ---------- Auto status ----------
+class TestAutoStatus:
+    def test_auto_status_matches_stock(self, s):
+        # Create order needing an item with matching stock
+        # Stock seed has ("LOYAL PRINT CS", "121") qty=3
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "TEST_AS_READY", "item": "LOYAL PRINT CS", "shade": "121",
+             "qty": 2, "rate": 0, "bill_no": ""},  # need 2, have 3 -> ready
+            {"party_name": "TEST_AS_ARR", "item": "LOYAL PRINT CS", "shade": "123",
+             "qty": 10, "rate": 0, "bill_no": ""},  # need 10, have 3 -> arrived
+            {"party_name": "TEST_AS_NR", "item": "NOSUCH", "shade": "999",
+             "qty": 1, "rate": 0, "bill_no": ""},  # not present -> not_ready
+        ]})
+        assert r.status_code == 200
+        ids = {x["party_name"]: x["id"] for x in r.json() if x["party_name"].startswith("TEST_AS_")}
+        r = s.post(f"{API}/order-rows/auto-status")
+        assert r.status_code == 200
+        rows = {x["id"]: x for x in r.json()}
+        assert rows[ids["TEST_AS_READY"]]["status"] == "ready"
+        assert rows[ids["TEST_AS_ARR"]]["status"] == "arrived"
+        assert rows[ids["TEST_AS_NR"]]["status"] == "not_ready"
+        for rid in ids.values():
+            s.delete(f"{API}/order-rows/{rid}")
+
+
+# ---------- Stock rows ----------
+class TestStockRows:
+    def test_stock_bulk_and_delete(self, s):
+        r = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+            {"group": "SH ROLL", "item": "TEST_STK", "shade": "S1", "quantity": 5, "row_index": 800}
+        ]})
+        assert r.status_code == 200
+        created = [x for x in r.json() if x["item"] == "TEST_STK"]
+        assert len(created) == 1
+        sid = created[0]["id"]
+        assert created[0]["quantity"] == 5
+
+        # blank-row skip
+        before = len(s.get(f"{API}/stock-rows").json())
+        r = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+            {"group": "", "item": "", "shade": "", "quantity": 0}
+        ]})
+        assert r.status_code == 200
+        assert len(s.get(f"{API}/stock-rows").json()) == before
+
+        r = s.delete(f"{API}/stock-rows/{sid}")
+        assert r.status_code == 200
+        assert not any(x["id"] == sid for x in s.get(f"{API}/stock-rows").json())
 
 
 # ---------- Dashboard ----------
 class TestDashboard:
-    def test_dashboard_stats(self, s, seeded):
+    def test_dashboard_shape(self, s):
         r = s.get(f"{API}/stats/dashboard")
         assert r.status_code == 200
         d = r.json()
-        for k in ["total_orders", "total_sales", "pending_dispatch", "total_dispatches",
-                  "stock_units", "products", "parties", "status_counts", "low_stock",
-                  "party_wise", "daily", "recent_dispatches"]:
+        for k in ["total_rows", "total_qty", "total_amount", "billed_rows",
+                  "unbilled_rows", "status_counts", "stock_lines", "stock_qty",
+                  "parties", "party_wise", "item_wise"]:
             assert k in d
-
-
-# ---------- Parties CRUD ----------
-class TestParties:
-    def test_create_and_delete_party(self, s):
-        payload = {"name": "TEST_Party_A", "phone": "9999999999", "city": "TestCity", "gst": "TESTGST"}
-        r = s.post(f"{API}/parties", json=payload)
-        assert r.status_code == 200, r.text
-        party = r.json()
-        assert party["name"] == payload["name"]
-        assert party.get("id")
-        # GET verify
-        parties = s.get(f"{API}/parties").json()
-        assert any(p["id"] == party["id"] for p in parties)
-        # delete
-        r = s.delete(f"{API}/parties/{party['id']}")
-        assert r.status_code == 200
-        parties = s.get(f"{API}/parties").json()
-        assert not any(p["id"] == party["id"] for p in parties)
-
-
-# ---------- Products CRUD + stock ----------
-class TestProducts:
-    def test_create_adjust_delete(self, s):
-        r = s.post(f"{API}/products", json={"name": "TEST_Prod", "sku": "TP1", "unit": "pcs", "rate": 100, "shop_stock": 5})
-        assert r.status_code == 200, r.text
-        p = r.json()
-        pid = p["id"]
-        assert p["shop_stock"] == 5
-
-        # +3
-        r = s.patch(f"{API}/products/{pid}/stock", json={"delta": 3, "note": "add"})
-        assert r.status_code == 200
-        assert r.json()["shop_stock"] == 8
-        # -2
-        r = s.patch(f"{API}/products/{pid}/stock", json={"delta": -2})
-        assert r.status_code == 200
-        assert r.json()["shop_stock"] == 6
-
-        r = s.delete(f"{API}/products/{pid}")
-        assert r.status_code == 200
-
-
-# ---------- End-to-end order->PO->receive->dispatch ----------
-class TestEndToEnd:
-    def test_full_flow(self, s, seeded):
-        parties = s.get(f"{API}/parties").json()
-        party = parties[0]
-
-        # create dedicated product with 0 stock to test stock inc on receive
-        r = s.post(f"{API}/products", json={"name": "TEST_E2E_Prod", "sku": "E2E", "unit": "pcs", "rate": 200, "shop_stock": 0})
-        prod = r.json()
-        pid = prod["id"]
-
-        # empty items -> 400
-        r = s.post(f"{API}/orders", json={"party_id": party["id"], "items": []})
-        assert r.status_code == 400
-
-        # create order for 10 units
-        r = s.post(f"{API}/orders", json={
-            "party_id": party["id"],
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 10, "rate": 200, "source": "company"}],
-            "notes": "test"
-        })
-        assert r.status_code == 200, r.text
-        order = r.json()
-        assert order["status"] == "pending"
-        assert order["total"] == 2000
-        oid = order["id"]
-
-        # create PO for 10 units linked to order
-        r = s.post(f"{API}/company-orders", json={
-            "supplier": "TEST_Supplier",
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 10}],
-            "order_ids": [oid],
-        })
-        assert r.status_code == 200, r.text
-        po = r.json()
-        po_id = po["id"]
-
-        # order status should flip to ordered_to_company
-        order2 = s.get(f"{API}/orders/{oid}").json()
-        assert order2["status"] == "ordered_to_company"
-
-        # receive more than PO qty -> 400
-        r = s.post(f"{API}/company-orders/{po_id}/receive", json={"items": [{"product_id": pid, "qty": 20}]})
-        assert r.status_code == 400
-
-        # partial receive 4
-        r = s.post(f"{API}/company-orders/{po_id}/receive", json={"items": [{"product_id": pid, "qty": 4}]})
-        assert r.status_code == 200
-        assert r.json()["status"] == "partial"
-        prod_after = s.get(f"{API}/products").json()
-        stock = next(p["shop_stock"] for p in prod_after if p["id"] == pid)
-        assert stock == 4
-
-        # order should still be ordered_to_company (not fully received)
-        order3 = s.get(f"{API}/orders/{oid}").json()
-        assert order3["status"] == "ordered_to_company"
-
-        # receive remaining 6
-        r = s.post(f"{API}/company-orders/{po_id}/receive", json={"items": [{"product_id": pid, "qty": 6}]})
-        assert r.status_code == 200
-        assert r.json()["status"] == "received"
-        # order should flip to received
-        order4 = s.get(f"{API}/orders/{oid}").json()
-        assert order4["status"] == "received"
-        # stock 10
-        stock = next(p["shop_stock"] for p in s.get(f"{API}/products").json() if p["id"] == pid)
-        assert stock == 10
-
-        # dispatch > order qty -> 400
-        r = s.post(f"{API}/dispatches", json={
-            "order_id": oid,
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 20}],
-            "transport": "TestT",
-        })
-        assert r.status_code == 400
-
-        # dispatch partial 6 -> stock 4
-        r = s.post(f"{API}/dispatches", json={
-            "order_id": oid,
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 6}],
-            "transport": "TestT",
-        })
-        assert r.status_code == 200
-        stock = next(p["shop_stock"] for p in s.get(f"{API}/products").json() if p["id"] == pid)
-        assert stock == 4
-        order5 = s.get(f"{API}/orders/{oid}").json()
-        assert order5["status"] == "partial"
-
-        # insufficient stock: try to dispatch 10 more but only 4 left
-        r = s.post(f"{API}/dispatches", json={
-            "order_id": oid,
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 4}],
-            "transport": "T",
-        })
-        # 4 remaining pending, 4 stock -> should succeed
-        assert r.status_code == 200
-        order6 = s.get(f"{API}/orders/{oid}").json()
-        assert order6["status"] == "dispatched"
-
-        # cleanup
-        s.delete(f"{API}/orders/{oid}")
-        s.delete(f"{API}/products/{pid}")
-
-    def test_insufficient_stock(self, s, seeded):
-        parties = s.get(f"{API}/parties").json()
-        party = parties[0]
-        r = s.post(f"{API}/products", json={"name": "TEST_LowStock", "sku": "LS", "rate": 10, "shop_stock": 1})
-        prod = r.json()
-        pid = prod["id"]
-
-        r = s.post(f"{API}/orders", json={
-            "party_id": party["id"],
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 5, "rate": 10, "source": "shop"}],
-        })
-        order = r.json()
-        oid = order["id"]
-
-        r = s.post(f"{API}/dispatches", json={
-            "order_id": oid,
-            "items": [{"product_id": pid, "name": prod["name"], "qty": 3}],
-            "transport": "T",
-        })
-        assert r.status_code == 400
-        assert "insufficient" in r.json().get("detail", "").lower()
-
-        s.delete(f"{API}/orders/{oid}")
-        s.delete(f"{API}/products/{pid}")
+        assert set(d["status_counts"].keys()) >= {"not_ready", "arrived", "ready"}
+        assert d["total_rows"] > 0

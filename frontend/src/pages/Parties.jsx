@@ -5,19 +5,14 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { useRole } from "../context/RoleContext";
 
-const empty = { name: "", phone: "", city: "", gst: "" };
+const empty = { name: "", page: "", phone: "", city: "" };
 
 export default function Parties() {
   const [rows, setRows] = useState([]);
@@ -33,51 +28,31 @@ export default function Parties() {
     try {
       await api.createParty(form);
       toast.success("Party added");
-      setForm(empty);
-      setOpen(false);
-      load();
+      setForm(empty); setOpen(false); load();
     } catch (e) { toast.error(errMsg(e)); }
-  };
-
-  const remove = async (id) => {
-    try { await api.deleteParty(id); toast.success("Party removed"); load(); }
-    catch (e) { toast.error(errMsg(e)); }
   };
 
   return (
     <div>
       <PageHeader
         testId="parties-page"
-        title="Parties"
-        subtitle="Customers you take orders from and dispatch to"
+        title="Party Master"
+        subtitle="Names and page numbers used by the Order Sheet dropdowns"
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="add-party-btn">Add party</Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button data-testid="add-party-btn">Add party</Button></DialogTrigger>
             <DialogContent data-testid="party-dialog">
               <DialogHeader><DialogTitle>New party</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                {[
-                  ["name", "Party name"],
-                  ["phone", "Phone"],
-                  ["city", "City"],
-                  ["gst", "GST number"],
-                ].map(([k, label]) => (
+                {[["name", "Party name"], ["page", "Page"], ["phone", "Phone"], ["city", "City"]].map(([k, label]) => (
                   <div key={k} className="space-y-1.5">
                     <Label htmlFor={k}>{label}</Label>
-                    <Input
-                      id={k}
-                      data-testid={`party-${k}-input`}
-                      value={form[k]}
-                      onChange={(e) => setForm({ ...form, [k]: e.target.value })}
-                    />
+                    <Input id={k} data-testid={`party-${k}-input`} value={form[k]}
+                      onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
                   </div>
                 ))}
               </div>
-              <DialogFooter>
-                <Button data-testid="save-party-btn" onClick={save}>Save party</Button>
-              </DialogFooter>
+              <DialogFooter><Button data-testid="save-party-btn" onClick={save}>Save party</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         }
@@ -87,11 +62,11 @@ export default function Parties() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
+              <TableHead>Party name</TableHead>
+              <TableHead>Page</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>City</TableHead>
-              <TableHead>GST</TableHead>
-              {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+              {isAdmin && <TableHead className="text-right">Delete</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -101,12 +76,13 @@ export default function Parties() {
             {rows.map((p) => (
               <TableRow key={p.id} className="row-hover" data-testid={`party-row-${p.id}`}>
                 <TableCell className="font-medium">{p.name}</TableCell>
+                <TableCell className="mono">{p.page || "—"}</TableCell>
                 <TableCell className="mono">{p.phone || "—"}</TableCell>
                 <TableCell>{p.city || "—"}</TableCell>
-                <TableCell className="mono text-xs">{p.gst || "—"}</TableCell>
                 {isAdmin && (
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" data-testid={`delete-party-${p.id}`} onClick={() => remove(p.id)}>
+                    <Button variant="ghost" size="icon" data-testid={`delete-party-${p.id}`}
+                      onClick={async () => { await api.deleteParty(p.id); toast.success("Removed"); load(); }}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TableCell>

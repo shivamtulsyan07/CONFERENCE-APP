@@ -1,0 +1,208 @@
+import { useCallback, useEffect, useState } from "react";
+import { api, errMsg, money, STATUS_META } from "../lib/api";
+import { useSheet } from "../lib/useSheet";
+import { SheetCell, Datalists } from "../components/SheetCell";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { toast } from "sonner";
+import { Save, Trash2, Wand2, Filter } from "lucide-react";
+
+export default function OrderSheet() {
+  const [lookups, setLookups] = useState({ parties: [], groups: [], items: [], shades: [], bill_nos: [], party_pages: {} });
+  const [showFilters, setShowFilters] = useState(true);
+
+  useEffect(() => { api.lookups().then(setLookups); }, []);
+
+  const columns = [
+    { key: "party_name", label: "Party Name", width: 260, options: lookups.parties, upper: true },
+    { key: "page", label: "Page", width: 70, numeric: true },
+    { key: "group", label: "Group", width: 110, options: lookups.groups, upper: true },
+    { key: "item", label: "ITEM", width: 190, options: lookups.items, upper: true },
+    { key: "shade", label: "SHADE", width: 90 },
+    { key: "qty", label: "QTY", width: 70, numeric: true },
+    { key: "mtr", label: "MTR", width: 110 },
+    { key: "rate", label: "Rate", width: 90, numeric: true },
+    { key: "amount", label: "Amount", width: 110, numeric: true },
+    { key: "bill_no", label: "BILL NO", width: 110, options: lookups.bill_nos, upper: true },
+  ];
+
+  const blankRow = {
+    party_name: "", page: "", group: "SH ROLL", item: "", shade: "",
+    qty: "", mtr: "", rate: "", amount: "", bill_no: "", status: "not_ready",
+  };
+
+  const blankZeros = (rows) =>
+    rows.map((r) => ({ ...r, qty: r.qty || "", rate: r.rate || "", amount: r.amount || "" }));
+
+  const load = useCallback(() => api.orderRows().then(blankZeros), []);
+  const save = useCallback((rows) => api.saveOrderRows(rows.map((r) => ({
+    ...r,
+    page: String(r.page ?? ""),
+    shade: String(r.shade ?? ""),
+    qty: Number(r.qty) || 0,
+    rate: Number(r.rate) || 0,
+    amount: Number(r.amount) || 0,
+  }))).then(blankZeros), []);
+
+  const sheet = useSheet({ columns, load, save, remove: api.deleteOrderRow, blankRow, minRows: 15 });
+
+  const onCell = (idx, col, value) => {
+    if (col.key === "party_name") {
+      const page = lookups.party_pages?.[value];
+      sheet.setRow(idx, page ? { party_name: value, page } : { party_name: value });
+      return;
+    }
+    if (col.key === "qty" || col.key === "rate") {
+      const row = sheet.rows[idx];
+      const qty = col.key === "qty" ? Number(value) || 0 : Number(row.qty) || 0;
+      const rate = col.key === "rate" ? Number(value) || 0 : Number(row.rate) || 0;
+      sheet.setRow(idx, { [col.key]: value, amount: qty && rate ? qty * rate : row.amount });
+      return;
+    }
+    sheet.setCell(idx, col.key, value);
+  };
+
+  const handleSave = async () => {
+    try {
+      const r = await sheet.persist();
+      toast.success(r.saved ? `${r.saved} row(s) saved` : "Nothing to save");
+      api.lookups().then(setLookups);
+    } catch (e) { toast.error(errMsg(e)); }
+  };
+
+  const cycleStatus = (idx) => {
+    const order = ["not_ready", "arrived", "ready"];
+    const cur = sheet.rows[idx].status || "not_ready";
+    sheet.setRow(idx, { status: order[(order.indexOf(cur) + 1) % 3] });
+  };
+
+  const autoMark = async () => {
+    try {
+      await api.autoStatus();
+      await sheet.refresh();
+      toast.success("Row colours updated from stock sheet");
+    } catch (e) { toast.error(errMsg(e)); }
+  };
+
+  const totals = sheet.filtered.reduce(
+    (a, { row }) => ({ qty: a.qty + (Number(row.qty) || 0), amount: a.amount + (Number(row.amount) || 0) }),
+    { qty: 0, amount: 0 }
+  );
+
+  return (
+    <div data-testid="order-sheet-page">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Order Sheet</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the colour box to change status
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" data-testid="toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="h-4 w-4 mr-1" /> Filters
+          </Button>
+          <Button variant="outline" data-testid="auto-status-btn" onClick={autoMark}>
+            <Wand2 className="h-4 w-4 mr-1" /> Auto colour from stock
+          </Button>
+          <Button data-testid="save-sheet-btn" onClick={handleSave} disabled={sheet.saving}>
+            <Save className="h-4 w-4 mr-1" />
+            {sheet.saving ? "Saving…" : `Save${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 mb-3 text-xs">
+        {Object.entries(STATUS_META).map(([k, m]) => (
+          <span key={k} className="flex items-center gap-2" data-testid={`legend-${k}`}>
+            <span className="h-3 w-5 border border-[#c9d3e0]" style={{ background: m.color }} />
+            {m.text}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid-panel overflow-auto max-h-[70vh]" data-testid="order-grid">
+        <table className="border-collapse w-max min-w-full">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-[#3F6F52] text-white">
+              <th className="w-10 border-r border-[#2f5540] px-2 py-2 text-xs font-semibold">#</th>
+              {columns.map((c) => (
+                <th key={c.key} className="border-r border-[#2f5540] px-2 py-2 text-xs font-bold uppercase tracking-wide text-left"
+                  style={{ width: c.width, minWidth: c.width }}>
+                  {c.label}
+                </th>
+              ))}
+              <th className="w-16 px-2 py-2 text-xs font-semibold">Del</th>
+            </tr>
+            {showFilters && (
+              <tr className="bg-[#eef2f7]">
+                <th />
+                {columns.map((c) => (
+                  <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                    <Input
+                      data-testid={`filter-${c.key}`}
+                      value={sheet.filters[c.key] || ""}
+                      onChange={(e) => sheet.setFilters({ ...sheet.filters, [c.key]: e.target.value })}
+                      placeholder="filter"
+                      className="h-7 text-xs"
+                    />
+                  </th>
+                ))}
+                <th className="border-b border-[#c9d3e0]" />
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {sheet.filtered.map(({ row, idx }) => (
+              <tr key={row.id || row._local || idx} style={{ background: STATUS_META[row.status || "not_ready"].color }}
+                data-testid={`order-row-${idx}`}>
+                <td className="border-r border-b border-[#c9d3e0] text-center p-0">
+                  <button
+                    data-testid={`status-toggle-${idx}`}
+                    title={STATUS_META[row.status || "not_ready"].text}
+                    onClick={() => cycleStatus(idx)}
+                    className="w-full h-8 text-[10px] text-[#0A2540]/70 hover:bg-black/10 transition-colors duration-150"
+                  >
+                    {idx + 1}
+                  </button>
+                </td>
+                {columns.map((c, ci) => (
+                  <SheetCell
+                    key={c.key}
+                    column={c}
+                    value={row[c.key]}
+                    rowIndex={idx}
+                    colIndex={ci}
+                    inputs={sheet.inputs}
+                    testId={`cell-${idx}-${c.key}`}
+                    onChange={(v) => onCell(idx, c, v)}
+                    onKeyDown={sheet.onKeyDown}
+                    onPaste={sheet.onPaste}
+                  />
+                ))}
+                <td className="border-b border-[#c9d3e0] text-center">
+                  <button data-testid={`delete-row-${idx}`} onClick={() => sheet.deleteRow(idx)}
+                    className="p-1 hover:text-destructive transition-colors duration-150">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="sticky bottom-0">
+            <tr className="bg-[#0A2540] text-white">
+              <td className="px-2 py-2 text-xs">Σ</td>
+              <td colSpan={4} className="px-2 py-2 text-xs">{sheet.filtered.length} rows shown</td>
+              <td className="px-2 py-2 text-xs text-right mono" data-testid="total-qty">{totals.qty}</td>
+              <td />
+              <td />
+              <td className="px-2 py-2 text-xs text-right mono" data-testid="total-amount">{money(totals.amount)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <Datalists columns={columns} />
+    </div>
+  );
+}
