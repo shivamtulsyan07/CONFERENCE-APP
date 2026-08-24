@@ -3,6 +3,7 @@ import { api, errMsg, money, STATUS_META } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { SheetContextMenu } from "../components/SheetContextMenu";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -11,10 +12,12 @@ import { Trash2, Wand2, Filter } from "lucide-react";
 export default function OrderSheet() {
   const [lookups, setLookups] = useState({ parties: [], conferences: [], groups: [], items: [], shades: [], bill_nos: [], party_pages: {} });
   const [showFilters, setShowFilters] = useState(true);
+  const [hidden, setHidden] = useState([]);
+  const [menu, setMenu] = useState(null);
 
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
-  const columns = [
+  const allColumns = [
     { key: "party_name", label: "Party Name", width: 250, options: lookups.parties, upper: true },
     { key: "page", label: "Page No.", width: 80, numeric: true },
     { key: "conference", label: "Conference Name", width: 160, options: lookups.conferences, upper: true },
@@ -26,6 +29,7 @@ export default function OrderSheet() {
     { key: "bill_no", label: "Bill Number", width: 115, options: lookups.bill_nos, upper: true },
     { key: "rate", label: "Rate", width: 90, numeric: true },
   ];
+  const columns = allColumns.filter((c) => !hidden.includes(c.key));
 
   const blankRow = {
     party_name: "", page: "", conference: "", group: "SH ROLL", item: "", shade: "",
@@ -47,7 +51,8 @@ export default function OrderSheet() {
   const saveRows = useCallback((rows) => api.saveOrderRows(rows.map(normalize)), []);
   const replaceRows = useCallback((rows) => api.replaceOrderRows(rows.map(normalize)), []);
 
-  const sheet = useSheet({ columns, load, save: saveRows, replace: replaceRows, remove: api.deleteOrderRow, blankRow, minRows: 15 });
+  const sheetBase = useSheet({ columns, allColumns, load, save: saveRows, replace: replaceRows, remove: api.deleteOrderRow, blankRow, minRows: 15 });
+  const sheet = { ...sheetBase, onContextMenu: setMenu };
 
   const onCell = (idx, col, value) => {
     if (col.key === "party_name") {
@@ -192,6 +197,14 @@ export default function OrderSheet() {
         </table>
       </div>
       <Datalists columns={columns} />
+      <SheetContextMenu
+        menu={menu}
+        close={() => setMenu(null)}
+        sheet={sheet}
+        hidden={hidden}
+        setHidden={setHidden}
+        columns={allColumns}
+      />
     </div>
   );
 }

@@ -20,6 +20,12 @@ export const SheetCell = ({
       } ${selected ? "bg-[#0066FF]/15" : ""}`}
       style={{ width: column.width, minWidth: column.width }}
       onMouseEnter={() => { sheet?.fillOver?.(rowIndex); sheet?.selectOver?.(rowIndex, colIndex); }}
+      onContextMenu={(e) => {
+        if (!sheet?.onContextMenu) return;
+        e.preventDefault();
+        if (!sheet.isSelected(rowIndex, colIndex)) sheet.setAnchor?.(rowIndex, colIndex);
+        sheet.onContextMenu({ x: e.clientX, y: e.clientY, row: rowIndex, col: colIndex, column });
+      }}
     >
       <input
         ref={(el) => { if (el) inputs.current[`${rowIndex}-${colIndex}`] = el; }}

@@ -3,6 +3,7 @@ import { api, errMsg } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { SheetContextMenu } from "../components/SheetContextMenu";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -11,15 +12,18 @@ import { Trash2, Filter } from "lucide-react";
 export default function StockSheet() {
   const [lookups, setLookups] = useState({ conferences: [], groups: [], items: [], shades: [] });
   const [showFilters, setShowFilters] = useState(true);
+  const [hidden, setHidden] = useState([]);
+  const [menu, setMenu] = useState(null);
 
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
-  const columns = [
+  const allColumns = [
     { key: "group", label: "Group Name", width: 150, options: lookups.groups, upper: true },
     { key: "item", label: "Item Name", width: 250, options: lookups.items, upper: true },
     { key: "shade", label: "Shade", width: 120 },
     { key: "quantity", label: "Quantity", width: 120, numeric: true },
   ];
+  const columns = allColumns.filter((c) => !hidden.includes(c.key));
 
   const blankRow = { group: "SH ROLL", item: "", shade: "", quantity: "" };
 
@@ -37,7 +41,8 @@ export default function StockSheet() {
   const saveRows = useCallback((rows) => api.saveStockRows(rows.map(normalize)), []);
   const replaceRows = useCallback((rows) => api.replaceStockRows(rows.map(normalize)), []);
 
-  const sheet = useSheet({ columns, load, save: saveRows, replace: replaceRows, remove: api.deleteStockRow, blankRow, minRows: 15 });
+  const sheetBase = useSheet({ columns, allColumns, load, save: saveRows, replace: replaceRows, remove: api.deleteStockRow, blankRow, minRows: 15 });
+  const sheet = { ...sheetBase, onContextMenu: setMenu };
 
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
@@ -131,6 +136,14 @@ export default function StockSheet() {
         </table>
       </div>
       <Datalists columns={columns} />
+      <SheetContextMenu
+        menu={menu}
+        close={() => setMenu(null)}
+        sheet={sheet}
+        hidden={hidden}
+        setHidden={setHidden}
+        columns={allColumns}
+      />
     </div>
   );
 }

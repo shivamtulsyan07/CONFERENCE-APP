@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 const AUTOSAVE_MS = 900;
 
 // Spreadsheet engine: keyboard nav, excel paste, filters, autosave, undo/redo.
-export function useSheet({ columns, load, save, replace, remove, blankRow, minRows = 12 }) {
+export function useSheet({ columns, allColumns, load, save, replace, remove, blankRow, minRows = 12 }) {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | dirty | saving | saved | error
   const [filters, setFilters] = useState({});
@@ -18,8 +18,8 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
   const timer = useRef(null);
   const rowsRef = useRef([]);
   const hist = useRef({ past: [], future: [] });
-  const cfg = useRef({ blankRow, minRows, columns, save, replace, remove, load });
-  cfg.current = { blankRow, minRows, columns, save, replace, remove, load };
+  const cfg = useRef({ blankRow, minRows, columns, allColumns, save, replace, remove, load });
+  cfg.current = { blankRow, minRows, columns, allColumns: allColumns || columns, save, replace, remove, load };
 
   const newRow = (i) => ({ ...cfg.current.blankRow, _local: `l${i}-${Math.random().toString(36).slice(2)}` });
 
@@ -48,12 +48,12 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
 
   const rowValues = (r) => {
     const o = { status: r.status || "not_ready" };
-    cfg.current.columns.forEach((c) => { o[c.key] = r[c.key] ?? ""; });
+    cfg.current.allColumns.forEach((c) => { o[c.key] = r[c.key] ?? ""; });
     return o;
   };
 
   const isBlank = (r) =>
-    cfg.current.columns.every(
+    cfg.current.allColumns.every(
       (c) => String(r[c.key] ?? "").trim() === String(cfg.current.blankRow[c.key] ?? "").trim()
     );
 
@@ -373,6 +373,54 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
     return () => window.removeEventListener("keydown", handler);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const fillDownSelection = () => {
+    const b = selBounds();
+    if (!b) return;
+    const cols = cfg.current.columns;
+    pushHistory();
+    const next = [...rowsRef.current];
+    const srcRow = next[b.r1] || {};
+    for (let r = b.r1 + 1; r <= b.r2; r++) {
+      if (!next[r]) continue;
+      const patch = {};
+      for (let c = b.c1; c <= b.c2; c++) patch[cols[c].key] = srcRow[cols[c].key] ?? "";
+      next[r] = { ...next[r], ...patch };
+      dirty.current.add(r);
+    }
+    commit(next);
+    scheduleSave();
+  };
+
+  const insertRow = async (idx, where = "above") => {
+    pushHistory();
+    const at = where === "below" ? idx + 1 : idx;
+    const next = [...rowsRef.current];
+    next.splice(at, 0, newRow(at));
+    commit(next);
+    await pushWhole(next);
+  };
+
+  const duplicateRow = async (idx) => {
+    pushHistory();
+    const src = rowsRef.current[idx];
+    if (!src) return;
+    const copy = { ...src, id: undefined, _local: `l${idx}-${Math.random().toString(36).slice(2)}` };
+    const next = [...rowsRef.current];
+    next.splice(idx + 1, 0, copy);
+    commit(next);
+    await pushWhole(next);
+  };
+
+  const clearRow = (idx) => {
+    pushHistory();
+    const next = [...rowsRef.current];
+    if (!next[idx]) return;
+    next[idx] = { ...next[idx], ...cfg.current.blankRow };
+    dirty.current.add(idx);
+    commit(next);
+    scheduleSave();
+  };
+
   const deleteRow = async (idx) => {
     pushHistory();
     const row = rowsRef.current[idx];
@@ -393,5 +441,6 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
     fillStart, fillOver, isInFill,
     selectStart, selectOver, isSelected, hasSelection: !!(sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2)),
     copySelection, cutSelection, pasteSelection, clearSelection,
+    insertRow, duplicateRow, clearRow, setAnchor, fillDownSelection,
   };
 }

@@ -132,9 +132,10 @@ class BulkStockRows(BaseModel):
 
 
 def is_blank_order(r: OrderRowIn):
+    # conference / page / group alone are not real content
     return not any([
-        r.party_name.strip(), r.page.strip(), r.conference.strip(),
-        r.item.strip(), r.shade.strip(), r.bill_no.strip(), r.qty, r.rate,
+        r.party_name.strip(), r.item.strip(), r.shade.strip(), r.bill_no.strip(),
+        r.mtr.strip(), r.qty, r.rate,
     ])
 
 

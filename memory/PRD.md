@@ -31,6 +31,9 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - Range selection with Cmd/Ctrl + C / X / V (click-drag or shift+arrows to select; COPY / CUT / PASTE toolbar buttons mirror it). Paste is a single undo step.
 
+- Right-click context menu on any cell (SheetContextMenu): Cut / Copy / Paste, Clear contents, Fill down in selection, Insert row above / below, Duplicate row, Clear row, Delete row, Hide column / Show all columns. Hidden columns are display-only (values are still saved via allColumns).
+- A row is only persisted when it has a party, item, shade, MTR, bill number, qty or rate — conference/page/group alone no longer creates an empty row.
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).
