@@ -397,6 +397,100 @@ class TestBalanceStock:
         s.delete(f"{API}/stock-rows/{stk}")
 
 
+# ---------- Order Summary (iteration 4 new) ----------
+class TestOrderSummary:
+    def test_summary_shape_and_totals_match_order_qty(self, s):
+        r = s.get(f"{API}/order-summary")
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["rows", "total_quantity", "total_lines"]:
+            assert k in d
+        assert isinstance(d["rows"], list)
+        # each row has group/item/shade/quantity/rows
+        for row in d["rows"][:10]:
+            for k in ["group", "item", "shade", "quantity", "rows"]:
+                assert k in row
+        # total_quantity should equal sum of qty across all order rows with item present
+        orders = s.get(f"{API}/order-rows").json()
+        expected = sum((o.get("qty") or 0) for o in orders if str(o.get("item", "")).strip())
+        assert abs(d["total_quantity"] - expected) < 1e-6
+        # total_lines equals unique group+item+shade
+        keys = {(str(o.get("group", "")).strip().upper(),
+                 str(o.get("item", "")).strip().upper(),
+                 str(o.get("shade", "")).strip())
+                for o in orders if str(o.get("item", "")).strip()}
+        assert d["total_lines"] == len(keys)
+
+    def test_summary_aggregates_group_item_shade(self, s):
+        """Two orders with same group+item+shade -> one summary row with summed qty."""
+        marker_item = "QA_SUM_ITEM_X"
+        r1 = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "QA_P1", "group": "QA_SUM_G", "item": marker_item, "shade": "S1",
+             "qty": 3, "rate": 0, "bill_no": ""},
+            {"party_name": "QA_P2", "group": "QA_SUM_G", "item": marker_item, "shade": "S1",
+             "qty": 5, "rate": 0, "bill_no": ""},
+            {"party_name": "QA_P3", "group": "QA_SUM_G", "item": marker_item, "shade": "S2",
+             "qty": 7, "rate": 0, "bill_no": ""},
+        ]})
+        ids = [e["id"] for e in r1.json()["saved"]]
+        try:
+            d = s.get(f"{API}/order-summary").json()
+            lines = [x for x in d["rows"] if x["item"].upper() == marker_item]
+            assert len(lines) == 2
+            by_shade = {x["shade"]: x for x in lines}
+            assert by_shade["S1"]["quantity"] == 8
+            assert by_shade["S1"]["rows"] == 2
+            assert by_shade["S2"]["quantity"] == 7
+            assert by_shade["S2"]["rows"] == 1
+        finally:
+            for rid in ids:
+                s.delete(f"{API}/order-rows/{rid}")
+
+
+# ---------- Iteration 4: blank+id deletes the row ----------
+class TestBlankRowDeletes:
+    def test_blank_order_row_with_id_deletes_server_side(self, s):
+        # create a row
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "QA_CUT_ORDER", "item": "QA_CUT_ITEM", "shade": "Z", "qty": 4,
+             "rate": 2, "bill_no": ""}
+        ]})
+        rid = r.json()["saved"][0]["id"]
+        assert any(x["id"] == rid for x in s.get(f"{API}/order-rows").json())
+        # send back blank row with id -> should delete
+        r2 = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"id": rid, "party_name": "", "page": "", "conference": "", "group": "",
+             "item": "", "shade": "", "qty": 0, "rate": 0, "bill_no": ""}
+        ]})
+        assert r2.status_code == 200
+        assert r2.json()["saved"] == []
+        assert not any(x["id"] == rid for x in s.get(f"{API}/order-rows").json())
+
+    def test_blank_stock_row_with_id_deletes_server_side(self, s):
+        r = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+            {"group": "QA_BLK_G", "item": "QA_BLK_ITEM", "shade": "Q", "quantity": 9}
+        ]})
+        sid = r.json()["saved"][0]["id"]
+        assert any(x["id"] == sid for x in s.get(f"{API}/stock-rows").json())
+        r2 = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+            {"id": sid, "group": "SH ROLL", "item": "", "shade": "", "quantity": 0}
+        ]})
+        assert r2.status_code == 200
+        assert r2.json()["saved"] == []
+        assert not any(x["id"] == sid for x in s.get(f"{API}/stock-rows").json())
+
+    def test_stock_bulk_group_only_default_does_not_create(self, s):
+        """A row containing only default Group Name (SH ROLL) and nothing else
+        must NOT create a DB row -- is_blank_stock ignores group entirely."""
+        before = len(s.get(f"{API}/stock-rows").json())
+        r = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+            {"group": "SH ROLL", "item": "", "shade": "", "quantity": 0}
+        ]})
+        assert r.status_code == 200
+        assert r.json()["saved"] == []
+        assert len(s.get(f"{API}/stock-rows").json()) == before
+
+
 # ---------- Dashboard ----------
 class TestDashboard:
     def test_dashboard_shape(self, s):

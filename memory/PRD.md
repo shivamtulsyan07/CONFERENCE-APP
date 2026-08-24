@@ -26,7 +26,10 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - Conference Order Summary page (/summary): item-wise totals (Group Name, Item Name, Shade, Quantity) from GET /api/order-summary, with filters and total.
 - Excel-style drag-to-fill: blue handle at each cell's bottom-right, hold and drag down/up to copy the value into the range (single undo step).
-- Sheet names: Conference Order (/orders), In House Stock (/stock), Balance Stock (/balance), Order Summary (/summary).
+- Sheet names: Conference Order (/orders), Conference Order Summary (/summary), In House Stock (/stock), Balance Stock (/balance).
+- Sheets always keep one trailing blank row; blank rows are never persisted and clearing a saved row deletes it.
+
+- Range selection with Cmd/Ctrl + C / X / V (click-drag or shift+arrows to select; COPY / CUT / PASTE toolbar buttons mirror it). Paste is a single undo step.
 
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.

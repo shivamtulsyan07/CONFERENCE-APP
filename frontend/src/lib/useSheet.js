@@ -9,6 +9,9 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
   const [filters, setFilters] = useState({});
   const [histSize, setHistSize] = useState({ past: 0, future: 0 });
   const [fill, setFill] = useState(null); // { col, key, value, from, to }
+  const [sel, setSel] = useState(null); // { r1, c1, r2, c2 }
+  const selRef = useRef(null);
+  const selecting = useRef(false);
 
   const inputs = useRef({});
   const dirty = useRef(new Set());
@@ -23,8 +26,11 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
   const pad = useCallback((list) => {
     const out = [...list];
     while (out.length < cfg.current.minRows) out.push(newRow(out.length));
+    // always keep one trailing blank row so the last row is safe to type into
+    const last = out[out.length - 1];
+    if (!last || !isBlank(last)) out.push(newRow(out.length));
     return out;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = (next) => {
     rowsRef.current = next;
@@ -46,13 +52,16 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
     return o;
   };
 
-  const isBlank = (r) => cfg.current.columns.every((c) => String(r[c.key] ?? "").trim() === "");
+  const isBlank = (r) =>
+    cfg.current.columns.every(
+      (c) => String(r[c.key] ?? "").trim() === String(cfg.current.blankRow[c.key] ?? "").trim()
+    );
 
   const flush = useCallback(async () => {
     const indices = [...dirty.current];
     const payload = indices
       .map((i) => ({ i, row: rowsRef.current[i] }))
-      .filter(({ row }) => row && !isBlank(row))
+      .filter(({ row }) => row && (!isBlank(row) || row.id))
       .map(({ row, i }) => ({ _i: i, id: row.id || null, row_index: row.row_index ?? i, ...rowValues(row) }));
     dirty.current = new Set();
     if (!payload.length) { setStatus("idle"); return; }
@@ -115,24 +124,27 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
 
   const onKeyDown = (e, r, c) => {
     const lastCol = cfg.current.columns.length - 1;
+    if (e.shiftKey && ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+      const s = selRef.current || { r1: r, c1: c, r2: r, c2: c };
+      const d = { ArrowDown: [1, 0], ArrowUp: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+      extendTo(Math.max(0, s.r2 + d[0]), Math.min(lastCol, Math.max(0, s.c2 + d[1])));
+      return;
+    }
     if (e.key === "Enter" || (e.key === "ArrowDown" && !e.shiftKey)) {
-      e.preventDefault(); focusCell(r + 1, c);
+      e.preventDefault(); focusCell(r + 1, c); setAnchor(r + 1, c);
     } else if (e.key === "ArrowUp") {
-      e.preventDefault(); focusCell(r - 1, c);
+      e.preventDefault(); focusCell(r - 1, c); setAnchor(r - 1, c);
     } else if (e.key === "Tab") {
       e.preventDefault();
-      if (e.shiftKey) { if (c > 0) focusCell(r, c - 1); else focusCell(r - 1, lastCol); }
-      else if (c < lastCol) focusCell(r, c + 1);
-      else focusCell(r + 1, 0);
+      if (e.shiftKey) { if (c > 0) { focusCell(r, c - 1); setAnchor(r, c - 1); } else { focusCell(r - 1, lastCol); setAnchor(r - 1, lastCol); } }
+      else if (c < lastCol) { focusCell(r, c + 1); setAnchor(r, c + 1); }
+      else { focusCell(r + 1, 0); setAnchor(r + 1, 0); }
     }
   };
 
-  const onPaste = (e, startRow, startCol) => {
-    const text = e.clipboardData.getData("text/plain");
-    if (!text || (!text.includes("\t") && !text.includes("\n"))) return;
-    e.preventDefault();
+  const applyMatrix = (matrix, startRow, startCol) => {
     const cols = cfg.current.columns;
-    const matrix = text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "").map((l) => l.split("\t"));
     pushHistory();
     const next = [...rowsRef.current];
     matrix.forEach((line, ri) => {
@@ -142,7 +154,7 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
       line.forEach((val, ci) => {
         const col = cols[startCol + ci];
         if (!col) return;
-        patch[col.key] = col.numeric ? String(val).replace(/[^0-9.]/g, "") : val.trim();
+        patch[col.key] = col.numeric ? String(val).replace(/[^0-9.]/g, "") : String(val).trim();
       });
       next[target] = { ...next[target], ...patch };
       dirty.current.add(target);
@@ -150,6 +162,15 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
     while (next.length < startRow + matrix.length + 1) next.push(newRow(next.length));
     commit(next);
     scheduleSave();
+  };
+
+  const onPaste = (e, startRow, startCol) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+    if (!text.includes("\t") && !text.includes("\n")) return;
+    e.preventDefault();
+    const matrix = text.replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "").map((l) => l.split("\t"));
+    applyMatrix(matrix, startRow, startCol);
   };
 
   // Make the server match `target` exactly (used by undo / redo / delete).
@@ -197,6 +218,103 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
 
   const fillRef = useRef(null);
 
+  const setAnchor = (r, c) => {
+    const s = { r1: r, c1: c, r2: r, c2: c };
+    selRef.current = s;
+    setSel(s);
+  };
+
+  const extendTo = (r, c) => {
+    const s = selRef.current;
+    if (!s) return setAnchor(r, c);
+    const n = { ...s, r2: r, c2: c };
+    selRef.current = n;
+    setSel(n);
+  };
+
+  const selectStart = (r, c, shift) => {
+    selecting.current = true;
+    if (shift) extendTo(r, c);
+    else setAnchor(r, c);
+  };
+
+  const selectOver = (r, c) => {
+    if (!selecting.current) return;
+    extendTo(r, c);
+  };
+
+  const isSelected = (r, c) => {
+    const s = sel;
+    if (!s) return false;
+    if (s.r1 === s.r2 && s.c1 === s.c2) return false;
+    return (
+      r >= Math.min(s.r1, s.r2) && r <= Math.max(s.r1, s.r2) &&
+      c >= Math.min(s.c1, s.c2) && c <= Math.max(s.c1, s.c2)
+    );
+  };
+
+  const selBounds = () => {
+    const s = selRef.current;
+    if (!s) return null;
+    return {
+      r1: Math.min(s.r1, s.r2), r2: Math.max(s.r1, s.r2),
+      c1: Math.min(s.c1, s.c2), c2: Math.max(s.c1, s.c2),
+    };
+  };
+
+  const selectionText = () => {
+    const b = selBounds();
+    if (!b) return "";
+    const cols = cfg.current.columns;
+    const lines = [];
+    for (let r = b.r1; r <= b.r2; r++) {
+      const row = rowsRef.current[r] || {};
+      const cells = [];
+      for (let c = b.c1; c <= b.c2; c++) cells.push(String(row[cols[c].key] ?? ""));
+      lines.push(cells.join("\t"));
+    }
+    return lines.join("\n");
+  };
+
+  const copySelection = async () => {
+    const text = selectionText();
+    if (!text) return false;
+    try { await navigator.clipboard.writeText(text); } catch (e) { /* clipboard blocked */ }
+    return true;
+  };
+
+  const clearSelection = () => {
+    const b = selBounds();
+    if (!b) return;
+    const cols = cfg.current.columns;
+    pushHistory();
+    const next = [...rowsRef.current];
+    for (let r = b.r1; r <= b.r2; r++) {
+      if (!next[r]) continue;
+      const patch = {};
+      for (let c = b.c1; c <= b.c2; c++) patch[cols[c].key] = "";
+      next[r] = { ...next[r], ...patch };
+      dirty.current.add(r);
+    }
+    commit(next);
+    scheduleSave();
+  };
+
+  const cutSelection = async () => {
+    const ok = await copySelection();
+    if (ok) clearSelection();
+  };
+
+  const pasteSelection = async () => {
+    const b = selBounds();
+    if (!b) return;
+    let text = "";
+    try { text = await navigator.clipboard.readText(); } catch (e) { return; }
+    if (!text) return;
+    const matrix = text.replace(/\r/g, "").split("\n").filter((l) => l !== "").map((l) => l.split("\t"));
+    if (matrix.length) applyMatrix(matrix, b.r1, b.c1);
+  };
+
   const fillStart = (idx, colIndex, key, value) => {
     const f = { col: colIndex, key, value, from: idx, to: idx };
     fillRef.current = f;
@@ -236,12 +354,27 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
   };
 
   useEffect(() => {
-    const up = () => fillEnd();
+    const up = () => { selecting.current = false; fillEnd(); };
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const deleteRow = async (idx) => {    pushHistory();
+  useEffect(() => {
+    const handler = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const b = selBounds();
+      const multi = b && (b.r1 !== b.r2 || b.c1 !== b.c2);
+      const key = e.key.toLowerCase();
+      if (key === "c" && multi) { e.preventDefault(); copySelection(); }
+      else if (key === "x" && multi) { e.preventDefault(); cutSelection(); }
+      else if (key === "v" && multi) { e.preventDefault(); pasteSelection(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deleteRow = async (idx) => {
+    pushHistory();
     const row = rowsRef.current[idx];
     const next = pad(rowsRef.current.filter((_, i) => i !== idx));
     commit(next);
@@ -258,5 +391,7 @@ export function useSheet({ columns, load, save, replace, remove, blankRow, minRo
     status, flush, deleteRow, refresh, inputs,
     undo, redo, canUndo: histSize.past > 0, canRedo: histSize.future > 0,
     fillStart, fillOver, isInFill,
+    selectStart, selectOver, isSelected, hasSelection: !!(sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2)),
+    copySelection, cutSelection, pasteSelection, clearSelection,
   };
 }

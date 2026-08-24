@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Undo2, Redo2, Check, Loader2, AlertTriangle, Copy, Scissors, ClipboardPaste } from "lucide-react";
 import { Button } from "./ui/button";
 
 const label = {
@@ -30,6 +30,36 @@ export const SheetToolbar = ({ sheet, prefix = "" }) => (
       title="Cmd/Ctrl + R"
     >
       <Redo2 className="h-4 w-4 mr-1" /> REDO
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      data-testid={`${prefix}copy-btn`}
+      disabled={!sheet.hasSelection}
+      onClick={sheet.copySelection}
+      title="Cmd/Ctrl + C"
+    >
+      <Copy className="h-4 w-4 mr-1" /> COPY
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      data-testid={`${prefix}cut-btn`}
+      disabled={!sheet.hasSelection}
+      onClick={sheet.cutSelection}
+      title="Cmd/Ctrl + X"
+    >
+      <Scissors className="h-4 w-4 mr-1" /> CUT
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      data-testid={`${prefix}paste-btn`}
+      disabled={!sheet.hasSelection}
+      onClick={sheet.pasteSelection}
+      title="Cmd/Ctrl + V"
+    >
+      <ClipboardPaste className="h-4 w-4 mr-1" /> PASTE
     </Button>
     <span
       data-testid={`${prefix}save-status`}

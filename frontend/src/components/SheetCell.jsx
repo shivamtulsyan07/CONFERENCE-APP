@@ -12,19 +12,21 @@ export const SheetCell = ({
 }) => {
   const listId = column.options ? `dl-${column.key}` : undefined;
   const inFill = sheet?.isInFill?.(rowIndex, colIndex);
+  const selected = sheet?.isSelected?.(rowIndex, colIndex);
   return (
     <td
       className={`relative border-r border-b border-[#c9d3e0] p-0 align-middle ${
         inFill ? "ring-2 ring-inset ring-[#0066FF]/60" : ""
-      }`}
+      } ${selected ? "bg-[#0066FF]/15" : ""}`}
       style={{ width: column.width, minWidth: column.width }}
-      onMouseEnter={() => sheet?.fillOver?.(rowIndex)}
+      onMouseEnter={() => { sheet?.fillOver?.(rowIndex); sheet?.selectOver?.(rowIndex, colIndex); }}
     >
       <input
         ref={(el) => { if (el) inputs.current[`${rowIndex}-${colIndex}`] = el; }}
         data-testid={testId}
         list={listId}
         value={value ?? ""}
+        onMouseDown={(e) => sheet?.selectStart?.(rowIndex, colIndex, e.shiftKey)}
         onChange={(e) => onChange(column.numeric ? e.target.value.replace(/[^0-9.]/g, "") : e.target.value)}
         onKeyDown={(e) => onKeyDown(e, rowIndex, colIndex)}
         onPaste={(e) => onPaste(e, rowIndex, colIndex)}

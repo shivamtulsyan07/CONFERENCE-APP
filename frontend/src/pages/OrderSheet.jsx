@@ -88,7 +88,7 @@ export default function OrderSheet() {
         <div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Order</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Type and Tab/Enter like Excel · drag the blue corner handle to copy a cell down · paste from a spreadsheet · click the SR number to change row colour
+            Type and Tab/Enter like Excel · click-drag to select a range, then Cmd/Ctrl + C / X / V · drag the blue corner handle to copy a cell down · click the SR number to change row colour
           </p>
         </div>
         <div className="flex flex-wrap gap-2 uppercase items-center">

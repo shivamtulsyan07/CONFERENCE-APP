@@ -106,7 +106,6 @@ class OrderRowIn(BaseModel):
 
 # ---------- Stock sheet row ----------
 class StockRow(BaseDocument):
-    conference: str = ""
     group: str = ""
     item: str = ""
     shade: str = ""
@@ -117,7 +116,6 @@ class StockRow(BaseDocument):
 
 class StockRowIn(BaseModel):
     id: Optional[str] = None
-    conference: str = ""
     group: str = ""
     item: str = ""
     shade: str = ""
@@ -134,11 +132,14 @@ class BulkStockRows(BaseModel):
 
 
 def is_blank_order(r: OrderRowIn):
-    return not any([r.party_name.strip(), r.item.strip(), r.shade.strip(), r.bill_no.strip(), r.qty, r.rate])
+    return not any([
+        r.party_name.strip(), r.page.strip(), r.conference.strip(),
+        r.item.strip(), r.shade.strip(), r.bill_no.strip(), r.qty, r.rate,
+    ])
 
 
 def is_blank_stock(r: StockRowIn):
-    return not any([r.conference.strip(), r.group.strip(), r.item.strip(), r.shade.strip(), r.quantity])
+    return not any([r.item.strip(), r.shade.strip(), r.quantity])
 
 
 # ---------- Parties API ----------
@@ -174,6 +175,8 @@ async def save_order_rows(payload: BulkOrderRows):
     saved = []
     for i, r in enumerate(payload.rows):
         if is_blank_order(r):
+            if r.id:
+                await db.order_rows.delete_one({"_id": oid(r.id)})
             continue
         data = r.model_dump(exclude={"id"})
         data["amount"] = (r.qty or 0) * (r.rate or 0)
@@ -257,6 +260,8 @@ async def save_stock_rows(payload: BulkStockRows):
     saved = []
     for i, r in enumerate(payload.rows):
         if is_blank_stock(r):
+            if r.id:
+                await db.stock_rows.delete_one({"_id": oid(r.id)})
             continue
         data = r.model_dump(exclude={"id"})
         if r.id:

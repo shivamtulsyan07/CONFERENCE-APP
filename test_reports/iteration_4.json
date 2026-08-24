@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 4 (range-select copy/cut/paste, GET /api/order-summary, blank+id deletes, is_blank_stock ignores group). Backend: extended /app/backend/tests/backend_test.py with TestOrderSummary (shape + totals match order qty + group+item+shade aggregation) and TestBlankRowDeletes (blank+id deletes order row, blank+id deletes stock row, SH-ROLL-only group does not persist). 23/23 pytest cases pass serially. Frontend Playwright validated on the live preview URL: (a) COPY/CUT/PASTE toolbar buttons are DISABLED for a single-cell selection and ENABLE after Shift+Arrow extends the range; (b) clicking COPY writes TSV to the clipboard (tab + newline present, 27 chars for a 2x2 range); (c) POST /api/order-rows/bulk with {id, everything blank} returns saved:[] and the row is gone on the next GET (matches CUT-of-entire-row delete); (d) POST /api/stock-rows/bulk with only default group SH ROLL returns saved:[] and creates no DB row; (e) /summary page renders, summary-total-qty (890) matches GET /api/order-summary total_quantity, summary-filter-item filters correctly; (f) /balance page renders, only-short-btn and balance-filter-item present and clickable; (g) sidebar labels DASHBOARD/CONFERENCE ORDER/ORDER SUMMARY/IN HOUSE STOCK/BALANCE STOCK/PARTIES render uppercase; (h) mobile 390x844 order-grid scrollWidth>clientWidth (horizontal scroll available). No new bugs found. RCA note added below for a real-user-data incident during first frontend script (mitigated).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/stock-rows / StockRow model", "issue": "StockRow still carries a 'conference' field although the iteration 3+4 spec removed the Conference column from In House Stock. Silently ignored by the UI but persisted from stale clients. Suggest removing from server.py."},
+      {"endpoint": "POST /api/order-rows/auto-status", "issue": "Aggregates stock per (group,item,shade) but does not deduct per-order demand across rows sharing the same key, so multiple order rows contending for the same limited stock can both flip to 'ready'. Product decision, non-blocking."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "OrderSheet with >=15 real rows", "issues": ["When the DB already has >= minRows records, useSheet.pad() adds NO trailing blank row. Users see the last DB row as the 'last row' and any edit to it modifies real data before an appended blank shows up. UX-only nit — consider always padding one extra blank sentinel row so the 'last row' is always safe to type into."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Remove vestigial 'conference' field from StockRow/StockRowIn in server.py.",
+    "Consider always padding one trailing blank sentinel row in useSheet.pad regardless of DB length, so users have a safe 'last row' to type into (see RCA below).",
+    "Continue to run backend_test.py with `pytest -n 0` — TestReplaceEndpoints wipes shared collections."
+  ],
+  "critical_code_review_comments": [
+    "useSheet.step (undo/redo) still calls pushWhole -> POST /replace which rewrites ALL 812+ rows for every undo. Consider a diff-based approach.",
+    "useSheet.pad only pads up to minRows(15); with 812 real rows there is no trailing blank sentinel, so the last visible row IS a real DB row and typing into it edits real data before applyPatch pushes a new blank. Suggest always ensuring a trailing blank.",
+    "server.py StockRow.conference still present although iteration 3/4 spec removed it.",
+    "The /replace endpoint is destructive (delete_many({}) then insert_many). A hiccup between those two operations would leave the collection empty. Consider bulk_write with a session and transaction, or at least a snapshot on the server side before delete_many."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestOrderSummary and TestBlankRowDeletes classes for iteration 4)"
+  ],
+  "success_rate": {"backend": "100% (23/23 serial)", "frontend": "100% of executed flows (range-select toolbar state, clipboard-write of TSV, blank+id delete, SH-ROLL-only not persisted, summary page + total + filter, balance page toggle + filter, sidebar uppercase, mobile grid scroll)"},
+  "test_credentials": "N/A - no auth in app",
+  "seed_data_creation": "Backend tests use QA_ prefix and clean up individually; /replace tests snapshot GET first and restore. Playwright seeded a PW_ITER4_MARKER order row via the API for the blank+id delete flow and cleaned it up in the same test. See RCA below for a first-attempt incident that was fully restored.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 4 endpoints/behaviour: GET /api/order-summary returns {rows:[{group,item,shade,quantity,rows}], total_quantity, total_lines}. POST /bulk with {id, all-blank} DELETES the row server-side (backs cut-of-entire-row and rollback). is_blank_stock ignores 'group' so a default SH-ROLL-only row does NOT create a DB row. Frontend toolbar buttons COPY/CUT/PASTE are gated by sheet.hasSelection which requires a MULTI-cell selection (single cell = disabled). Clipboard permissions must be granted to Playwright via context.grant_permissions(['clipboard-read','clipboard-write']). CRITICAL SAFETY NOTE: DB has ~812 REAL user order rows. useSheet.pad only pads to minRows=15, so on the /orders sheet the last visible row IS a real DB row -- typing into it OVERWRITES real user data before applyPatch appends a new blank sentinel. Always seed a marker row via POST /api/order-rows/bulk and filter to isolate it before UI edits; do NOT type into 'the last row' assuming it is blank. Backend tests must be run with `pytest -n 0` because TestReplaceEndpoints wipes collections and races with the pinned -n 2 --dist loadscope config.",
+  "rca of the issue": "First frontend script queried document rows via `[data-testid^=\"order-row-\"]` (returned 812 = all real DB rows), then typed PW_ITER4_MARK into cell-811-party_name, assuming the 'last row' would be a blank padded sentinel. It was NOT: useSheet.pad only pads to minRows(15), and with 812 real DB rows the row at idx 811 is a real user row (VINAYAK SAREE, DALSINGHSARAI VARTAN LS 701 qty=1). Autosave immediately overwrote the row's party_name. Reproduction: on /orders with >=15 rows, click the last-row party_name cell and type — the existing party name is replaced. Mitigation: identified the modified row via GET /api/order-rows (party_name='PW_ITER4_MARK', row_index=811, id=6a8c2e771d5d61ba6b16a2bc), then POST /api/order-rows/bulk with id + original values restored the party_name to 'VINAYAK SAREE, DALSINGHSARAI'. Total row count 812 unchanged, no PW_ markers remain. Recommended fix for the app: useSheet.pad should always append at least one trailing blank row regardless of DB length so users have a safe 'append' row. Recommended fix for testers: never type into the visible last row of an already-populated sheet — seed via API and filter to isolate."
+}

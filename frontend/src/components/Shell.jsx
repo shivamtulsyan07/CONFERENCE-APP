@@ -7,7 +7,7 @@ import { Button } from "./ui/button";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
   { to: "/orders", label: "Conference Order", icon: Table2, id: "orders" },
-  { to: "/summary", label: "Order Summary", icon: ListTree, id: "summary" },
+  { to: "/summary", label: "Conference Order Summary", icon: ListTree, id: "summary" },
   { to: "/stock", label: "In House Stock", icon: Boxes, id: "stock" },
   { to: "/balance", label: "Balance Stock", icon: Scale, id: "balance" },
   { to: "/parties", label: "Parties", icon: Users, id: "parties" },
