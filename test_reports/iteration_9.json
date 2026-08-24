@@ -1,0 +1,37 @@
+{
+  "summary": "Tested HAANA-like additions: /api/stats/overview filters, drill-downs, Claude Sonnet 4.6 assistant. Backend pytest 8/9 passed (1 real bug found: `applied` echo is wrong due to param shadowing). Filter narrowing verified for group/party/item/combined/conference; unfiltered totals >= filtered. Assistant streaming works with real data (answer contained '812' = actual order_rows), no markdown asterisks, history persisted, multi-turn stored 2 user + 2 assistant messages. Empty message returns 400. Frontend: filter bar changes KPIs (890->110 qty for AAPKI DUKAN), CLEAR resets, all 6 KPI drill-downs navigate to correct route (/orders, /stock, /company-order, /company-balance, /stock-arrived, /summary), shortfall-row-0 -> /company-order?q=CUTE%20COUPLE with grid search prefilled to 'CUTE COUPLE', party-row-0/item-row-0 populate global filters, Haana input+send+chip work, streaming assistant answered '812', history persisted across reload, refresh + fullscreen toggle still work.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/stats/overview", "issue": "Response field `applied` is not the input filter but the last row iterated: party/item are shadowed by loop variables inside `dashboard_overview`. With no filters and 812 rows, applied={party:'VINAYAK SAREE, DALSINGHSARAI', item:'VARTAN LS'} while filters are actually empty (kpis.order_rows=812 unfiltered). Filtering behaviour itself is correct because `keep_order` captures the parameters via closure before the loop runs; only the echoed `applied` is wrong. Frontend Dashboard.jsx does not consume `applied`, so no visible UI regression today, but any client relying on it (or future URL sync) will be misled."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_haana_filters.py",
+    "/app/backend/tests/test_dashboard_overview.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [
+    "Fix param shadowing in server.py dashboard_overview: rename inner loop variables (e.g. use `it_name` and `party_name_val`) or return `applied` explicitly from the original params (e.g. compute the dict at the top before the loop)."
+  ],
+  "critical_code_review_comments": [
+    "server.py dashboard_overview: `party = ...` and `item = ...` inside the orders loop overwrite the function parameters, corrupting the returned `applied` echo.",
+    "server.py assistant_ask returns text/plain streaming without SSE - matches HaanaAssistant.jsx reader which decodes chunks. Good.",
+    "assistant_snapshot() calls dashboard_overview() as a plain coroutine - works but tightly couples the assistant to the dashboard API shape. Consider extracting a shared aggregator.",
+    "Duplicate @api_router.post decorator for /stock-rows/bulk (lines 290-291) still present - harmless, cleanup recommended.",
+    "assistant_ask: history is fetched from mongo with sort but stored strings can be long; the -10 truncation is done in Python after loading up to 20 - fine at current scale.",
+    "Dashboard.jsx: `filter-conference` options currently empty (seed has conference='') so the filter renders only 'ALL' - not a bug, just noting for UX visibility."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "89% (8/9)", "frontend": "100%"},
+  "seed_data_creation": "Existing seed (~812 order rows, 10 parties). No new seed created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New endpoints tested: /api/stats/overview?conference|group|party|item; /api/assistant/ask (streaming text/plain); /api/assistant/history/{sid}. Only known bug is the `applied` echo shadowing in dashboard_overview - filter *behaviour* is correct. Assistant costs LLM credits (3 calls used this iteration: 1 ask + 1 chip trigger + multi-turn 2 calls in backend test). Frontend testids stable: filter-conference, filter-group, filter-party, filter-item, clear-filters-btn, kpi-*, shortfall-row-N, party-row-N, item-row-N, panel-haana, haana-input, haana-send, haana-chip-N, haana-msg-user-N, haana-msg-assistant-N.",
+  "rca of the issue": "dashboard_overview() declares `conference`, `group`, `party`, `item` as function parameters. Inside the for-loop over orders, `party = str(r.get('party_name','')).strip() or '—'` and `item = str(r.get('item','')).strip()` rebind those same names in the local scope. After the loop, when the response body builds `\"applied\": {..., \"party\": party, \"item\": item}`, `party` and `item` point to the LAST iterated order row rather than the original query parameters. Reproduction: `curl $BACKEND/api/stats/overview` with no query params returns `applied.party='VINAYAK SAREE, DALSINGHSARAI'` and `applied.item='VARTAN LS'` (which is exactly the party_name/item of row_index=811). Fix: either rename the loop locals (e.g. `p_name`, `it_name`) or snapshot the params into a dict up front, e.g. `applied = {'conference': conference, 'group': group, 'party': party, 'item': item}` immediately after the def and reuse `applied` in the return."
+}

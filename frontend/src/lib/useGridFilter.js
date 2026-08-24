@@ -4,7 +4,9 @@ import { matchRow, sortRows, activeCount, emptyFilter } from "./filters";
 // Filtering / sorting / search for read-only grids.
 export function useGridFilter(rows, columns) {
   const [filters, setFilters] = useState({});
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(
+    () => new URLSearchParams(window.location.search).get("q") || ""
+  );
   const [sort, setSort] = useState(null);
 
   const colsByKey = useMemo(

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="9" time="11.828" timestamp="2026-08-24T12:56:24.483792+00:00" hostname="agent-env-429c0739-39e1-495f-a8f6-090f9102f021"><testcase classname="tests.test_haana_filters" name="test_filter_options_present" time="0.389"><failure message="AssertionError: assert {'conference'...: 'VARTAN LS'} == {'conference'...', 'item': ''}&#10;  &#10;  Omitting 2 identical items, use -vv to show&#10;  Differing items:&#10;  {'item': 'VARTAN LS'} != {'item': ''}&#10;  {'party': 'VINAYAK SAREE, DALSINGHSARAI'} != {'party': ''}&#10;  &#10;  Full diff:...&#10;  &#10;  ...Full output truncated (9 lines hidden), use '-vv' to show">backend/tests/test_haana_filters.py:32: in test_filter_options_present
+    assert base_overview["applied"] == {"conference": "", "group": "", "party": "", "item": ""}
+E   AssertionError: assert {'conference'...: 'VARTAN LS'} == {'conference'...', 'item': ''}
+E     
+E     Omitting 2 identical items, use -vv to show
+E     Differing items:
+E     {'item': 'VARTAN LS'} != {'item': ''}
+E     {'party': 'VINAYAK SAREE, DALSINGHSARAI'} != {'party': ''}
+E     
+E     Full diff:...
+E     
+E     ...Full output truncated (9 lines hidden), use '-vv' to show</failure></testcase><testcase classname="tests.test_haana_filters" name="test_filter_by_group" time="0.067" /><testcase classname="tests.test_haana_filters" name="test_filter_by_party" time="0.071" /><testcase classname="tests.test_haana_filters" name="test_filter_by_item" time="0.069" /><testcase classname="tests.test_haana_filters" name="test_filter_combined" time="0.074" /><testcase classname="tests.test_haana_filters" name="test_filter_conference" time="0.071" /><testcase classname="tests.test_haana_filters" name="test_assistant_empty_message" time="1.375" /><testcase classname="tests.test_haana_filters" name="test_assistant_ask_and_history" time="3.090" /><testcase classname="tests.test_haana_filters" name="test_assistant_multi_turn" time="6.555" /></testsuite></testsuites>

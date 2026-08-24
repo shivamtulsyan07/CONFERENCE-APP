@@ -724,12 +724,47 @@ async def dashboard_stats():
     }
 
 
+def _norm(v):
+    return str(v or "").strip().upper()
+
+
 @api_router.get("/stats/overview")
-async def dashboard_overview():
-    orders = await db.order_rows.find().to_list(20000)
+async def dashboard_overview(conference: str = "", group: str = "", party: str = "", item: str = ""):
+    all_orders = await db.order_rows.find().to_list(20000)
     stock = await db.stock_rows.find().to_list(20000)
     sent = await db.company_sent_rows.find().to_list(20000)
     arrived = await db.company_arrived_rows.find().to_list(20000)
+
+    filter_options = {
+        "conferences": sorted({str(o.get("conference", "")).strip() for o in all_orders if str(o.get("conference", "")).strip()}),
+        "groups": sorted({str(o.get("group", "")).strip() for o in all_orders if str(o.get("group", "")).strip()}),
+        "parties": sorted({str(o.get("party_name", "")).strip() for o in all_orders if str(o.get("party_name", "")).strip()}),
+        "items": sorted({str(o.get("item", "")).strip() for o in all_orders if str(o.get("item", "")).strip()}),
+    }
+
+    def keep_order(o):
+        if conference and _norm(o.get("conference")) != _norm(conference):
+            return False
+        if group and _norm(o.get("group")) != _norm(group):
+            return False
+        if party and _norm(o.get("party_name")) != _norm(party):
+            return False
+        if item and _norm(o.get("item")) != _norm(item):
+            return False
+        return True
+
+    def keep_line(r):
+        if group and _norm(r.get("group")) != _norm(group):
+            return False
+        if item and _norm(r.get("item")) != _norm(item):
+            return False
+        return True
+
+    applied = {"conference": conference, "group": group, "party": party, "item": item}
+    orders = [o for o in all_orders if keep_order(o)]
+    stock = [s for s in stock if keep_line(s)]
+    sent = [s for s in sent if keep_line(s)]
+    arrived = [a for a in arrived if keep_line(a)]
 
     def key3(g, i, s):
         return (str(g or "").strip().upper(), str(i or "").strip().upper(), str(s or "").strip())
@@ -837,7 +872,103 @@ async def dashboard_overview():
         "item_wise": items_out,
         "pending_company": pending_company,
         "shortfalls": shortfalls,
+        "filter_options": filter_options,
+        "applied": applied,
     }
+
+
+# ---------- AI assistant (Claude Sonnet 4.6) ----------
+class AskIn(BaseModel):
+    session_id: str
+    message: str
+
+
+ASSISTANT_SYSTEM = (
+    "You are HAANA, the operations analyst for a saree/fabric conference order desk. "
+    "You answer strictly from the live DATA SNAPSHOT given to you. "
+    "Be short and concrete: numbers first, then a one-line reason or action. "
+    "Use plain digits, Indian number style. Write plain text only — never use markdown, asterisks or backticks. "
+    "If the snapshot does not contain the answer, say so. "
+    "Never invent items, parties or quantities."
+)
+
+
+async def assistant_snapshot():
+    ov = await dashboard_overview()
+    k = ov["kpis"]
+    lines = [
+        "KPIS: " + ", ".join(f"{a}={b}" for a, b in k.items()),
+        f"STATUS ROWS: {ov['status_counts']}",
+        "PARTY WISE (party | rows | qty | ready | pending | billed):",
+    ]
+    for p in ov["party_wise"][:40]:
+        lines.append(f"- {p['party']} | {p['rows']} | {p['qty']} | {p['ready']} | {p['pending']} | {p['billed']}")
+    lines.append("TOP ITEMS (item | group | qty | parties):")
+    for i in ov["item_wise"][:40]:
+        lines.append(f"- {i['item']} | {i['group']} | {i['qty']} | {i['parties']}")
+    lines.append("SHORTFALL TO ORDER FROM COMPANY (group | item | shade | demand | stock | to_order):")
+    for r in ov["shortfalls"][:60]:
+        lines.append(f"- {r['group']} | {r['item']} | {r['shade']} | {r['ordered_qty']} | {r['stock_qty']} | {r['to_order']}")
+    lines.append("PENDING AT COMPANY (group | item | shade | sent | arrived | pending | last_sent):")
+    for r in ov["pending_company"][:60]:
+        lines.append(f"- {r['group']} | {r['item']} | {r['shade']} | {r['sent_qty']} | {r['arrived_qty']} | {r['balance_qty']} | {r['last_date']}")
+    return "\n".join(lines)
+
+
+@api_router.get("/assistant/history/{session_id}")
+async def assistant_history(session_id: str):
+    docs = await db.assistant_messages.find({"session_id": session_id}).sort("created_at", 1).to_list(200)
+    return [{"role": d["role"], "text": d["text"], "created_at": d["created_at"]} for d in docs]
+
+
+@api_router.post("/assistant/ask")
+async def assistant_ask(payload: AskIn):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+
+    question = payload.message.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Message is empty")
+
+    snapshot = await assistant_snapshot()
+    history = await db.assistant_messages.find({"session_id": payload.session_id}).sort("created_at", 1).to_list(20)
+    transcript = "\n".join(f"{h['role'].upper()}: {h['text']}" for h in history[-10:])
+
+    system_message = ASSISTANT_SYSTEM + "\n\nDATA SNAPSHOT:\n" + snapshot
+    if transcript:
+        system_message += "\n\nEARLIER IN THIS CONVERSATION:\n" + transcript
+
+    chat = LlmChat(
+        api_key=key,
+        session_id=payload.session_id,
+        system_message=system_message,
+    ).with_model("anthropic", "claude-sonnet-4-6")
+
+    await db.assistant_messages.insert_one({
+        "session_id": payload.session_id, "role": "user", "text": question, "created_at": now_iso(),
+    })
+
+    async def gen():
+        full = ""
+        try:
+            async for ev in chat.stream_message(UserMessage(text=question)):
+                if isinstance(ev, TextDelta):
+                    full += ev.content
+                    yield ev.content
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:  # surface failure to the user instead of a silent hang
+            logging.exception("assistant stream failed")
+            yield f"\n[assistant error: {e}]"
+        if full:
+            await db.assistant_messages.insert_one({
+                "session_id": payload.session_id, "role": "assistant", "text": full, "created_at": now_iso(),
+            })
+
+    return StreamingResponse(gen(), media_type="text/plain", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @api_router.post("/seed")
