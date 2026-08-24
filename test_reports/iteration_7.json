@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 7: added /company-balance and the two new line-sheet collections (company_sent_rows / company_arrived_rows). Backend: created /app/backend/tests/test_line_sheets.py with 15 targeted tests (line-sheet CRUD + blank-with-id delete + replace, /company-balance maths, routing regression). Full backend suite (backend_test.py + test_line_sheets.py) = 43/43 PASSED with `-n 0` as instructed. Frontend Playwright end-to-end (desktop 1920): navigated /company-balance, autosaved sent(QA GRP,QA ITEM,9,10), autosave debounce + save-status='SAVED' after 2.2s, /api/company-balance -> total_sent=10 total_balance=10 pending=1; cb stat cards match (cb-stat-sent=10, cb-stat-arrived=0, cb-stat-balance=10, cb-stat-pending=1). Navigated /stock-arrived, added arrival 4 -> /company-balance total_arrived=4 total_balance=6, cb-extra-0-arrived_qty='4', cb-extra-0-balance_qty='6' (blue text >0). Added arrival 6 -> total_arrived=10 total_balance=0 (accumulation ✓). Reloaded /stock-arrived -> both quantities persisted (4, 6). Deleted arrival row -> balance restored to 6 (arrival delete ✓). Filter popover cb-filter-item opens (Radix portal) — verified visible. Global search cb-global-search narrows footer to '1 rows shown'. Toolbar buttons cb-undo/redo/copy/cut/paste-btn all visible. Sidebar contains all 9 nav-* items in required order incl nav-company-balance & nav-stock-arrived. Footer 'rows shown' excludes trailing blank sentinel on sa-page: footer='Σ 2 rows shown 10' with 2 real rows + 1 blank ✓. Routing regression: /order-rows, /stock-rows, /parties, /lookups, /order-summary, /balance-stock, /company-order, /company-balance, /stats/dashboard all return 200 — /line-sheet/{sheet} does NOT shadow them. Real user data (812 order rows, 10 stock rows) untouched — only QA collections written and cleaned up in autouse fixture and end-of-test.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_line_sheets.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional polish: (1) /company-balance treats negative balance rows as pending=false (line 461: sum(1 for r if balance_qty>0). Spec says 'report the behaviour, no crash' — current behaviour is over-arrival still shows in rows but is EXCLUDED from pending_lines and total_balance goes negative — that is correct per spec. (2) The cb-stat cards render the label and number without a space separator ('Total sent to company10') — cosmetic (they are two nested divs, only concatenated when reading textContent). No visual issue in the UI. (3) Autouse cleanup fixture in test_line_sheets.py is safe because both company_sent_rows and company_arrived_rows are QA-only collections per E1's note — never touches order_rows / stock_rows."
+  ],
+  "critical_code_review_comments": [
+    "server.py line_collection(): correctly 404s on unknown sheet (verified by test_unknown_sheet_returns_404). LINE_COLLECTIONS whitelist prevents arbitrary collection access — good.",
+    "server.py /company-balance keys on (group.upper, item.upper, shade) — same convention as balance-stock/company-order. Consistent across the codebase.",
+    "server.py is_blank_line() ignores group entirely (only item/shade/quantity/remark count) — matches is_blank_stock; ensures the default 'SH ROLL' group doesn't create phantom rows. Verified.",
+    "CompanyBalanceOrder.jsx keyOf() builds the same composite key on the client for O(1) map lookup — matches server logic. Note: if server-side changed casing rules later, this would silently drift; consider extracting into a shared util.",
+    "LineSheet.jsx footer colSpan math: colSpan={Math.max(1, columns.length - 3)} then Total-qty td, then colSpan={2 + extraColumns.length + 1}. For CB (6 cols, 2 extra) = 3 + 1 + 5 = 9, total cols = 1 (SR) + 6 + 2 + 1 (Del) = 10; footer covers 1 (SR) + 3 + 1 + 5 = 10 ✓. For SA (6 cols, 0 extra) = 3 + 1 + 3 = 7, total = 1 + 6 + 0 + 1 = 8; footer covers 1 + 3 + 1 + 3 = 8 ✓.",
+    "useSheet.dataCount = filtered.filter(!isBlank).length — correctly excludes trailing blank on all editable sheets; matches request line item.",
+    "LineSheet extraValue callback for read-only Arrived/Balance columns uses row.quantity as sent qty for balance when no server row exists yet (during autosave debounce). Small UX perk — verified in place.",
+    "No file exceeds 700 lines; server.py is 787 lines total which is at the edge — consider splitting the seed + xlsx/pdf helpers into a separate module in a future iteration.",
+    "All new interactive elements have data-testid (cb-* and sa-* prefixes) ✓."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_line_sheets.py (new)"
+  ],
+  "success_rate": { "backend": "100% (43/43 with -n 0)", "frontend": "100% of 12 requested flows validated end-to-end" },
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "QA rows on company_sent_rows / company_arrived_rows only; all cleaned up in autouse fixture and Playwright finally block. Real order_rows (812) and stock_rows (10) never touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Line-sheet routes: GET/POST /api/line-sheet/{sheet} where sheet in {company-sent-rows, company-arrived-rows}. Unknown sheet -> 404. Bulk contract mirrors order-rows/bulk: {rows:[{id?, group, item, shade, quantity, date, remark, row_index}]} returns {saved:[{index,id}]}. Blank line (no item, no shade, no quantity, no remark) with an id -> deletes; without id -> skipped. /api/company-balance aggregates by (group.upper|item.upper|shade), returns {rows, total_sent, total_arrived, total_balance, pending_lines}. pending_lines counts only balance_qty > 0 (negative excluded — intentional). Frontend testid prefixes: cb- (Company Balance Order) and sa- (Stock Arrived). Nav: nav-company-balance, nav-stock-arrived. Sidebar order verified matches spec. Both collections are QA-safe — future testing agents can write/delete freely. Pytest MUST be run with -n 0 for test_line_sheets.py because its autouse fixture wipes the collections between tests (fails under loadscope=2 parallel workers).",
+  "rca of the issue": "N/A - no bugs found. Only implementation note: my initial pytest run under the default -n 2 loadscope config failed 6/15 because two workers race on the shared QA collections. Re-ran with -n 0 (as E1 instructed in prev_test_files_and_folder) and got 15/15 + full suite 43/43. Documented so the next agent doesn't repeat this."
+}

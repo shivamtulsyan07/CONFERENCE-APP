@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { matchRow, activeCount } from "./filters";
 
 const AUTOSAVE_MS = 900;
 
@@ -7,6 +8,7 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | dirty | saving | saved | error
   const [filters, setFilters] = useState({});
+  const [search, setSearch] = useState("");
   const [histSize, setHistSize] = useState({ past: 0, future: 0 });
   const [fill, setFill] = useState(null); // { col, key, value, from, to }
   const [sel, setSel] = useState(null); // { r1, c1, r2, c2 }
@@ -109,13 +111,12 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
   const setRow = (idx, patch) => applyPatch(idx, patch);
 
   const filtered = useMemo(() => {
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim());
+    const colsByKey = Object.fromEntries(columns.map((c) => [c.key, c]));
     const all = rows.map((r, i) => ({ row: r, idx: i }));
-    if (!active.length) return all;
-    return all.filter(({ row }) =>
-      active.every(([k, v]) => String(row[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
-    );
-  }, [rows, filters]);
+    const anyFilter = Object.values(filters || {}).some((f) => f && typeof f === "object");
+    if (!anyFilter && !search.trim()) return all;
+    return all.filter(({ row }) => isBlank(row) || matchRow(row, filters, colsByKey, search));
+  }, [rows, filters, columns, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const focusCell = (r, c) => {
     const el = inputs.current[`${r}-${c}`];
@@ -436,6 +437,11 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
 
   return {
     rows, filtered, filters, setFilters, setCell, setRow, onKeyDown, onPaste,
+    dataCount: filtered.filter(({ row }) => !isBlank(row)).length,
+    search, setSearch,
+    setFilter: (key, f) => setFilters((prev) => ({ ...prev, [key]: f })),
+    clearFilters: () => { setFilters({}); setSearch(""); },
+    filterCount: activeCount(filters) + (search.trim() ? 1 : 0),
     status, flush, deleteRow, refresh, inputs,
     undo, redo, canUndo: histSize.past > 0, canRedo: histSize.future > 0,
     fillStart, fillOver, isInFill,

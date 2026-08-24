@@ -125,6 +125,36 @@ class StockRowIn(BaseModel):
     row_index: int = 0
 
 
+class LineRow(BaseDocument):
+    group: str = ""
+    item: str = ""
+    shade: str = ""
+    quantity: float = 0
+    date: str = ""
+    remark: str = ""
+    row_index: int = 0
+    created_at: str = Field(default_factory=now_iso)
+
+
+class LineRowIn(BaseModel):
+    id: Optional[str] = None
+    group: str = ""
+    item: str = ""
+    shade: str = ""
+    quantity: float = 0
+    date: str = ""
+    remark: str = ""
+    row_index: int = 0
+
+
+class BulkLineRows(BaseModel):
+    rows: List[LineRowIn]
+
+
+def is_blank_line(r: LineRowIn):
+    return not any([r.item.strip(), r.shade.strip(), r.quantity, r.remark.strip()])
+
+
 class BulkOrderRows(BaseModel):
     rows: List[OrderRowIn]
 
@@ -319,6 +349,116 @@ async def lookups():
         "items": uniq([r.get("item", "") for r in order_rows] + [r.get("item", "") for r in stock_rows]),
         "shades": uniq([r.get("shade", "") for r in order_rows] + [r.get("shade", "") for r in stock_rows]),
         "bill_nos": uniq([r.get("bill_no", "") for r in order_rows]),
+    }
+
+
+# ---------- Company sent / arrived line sheets ----------
+LINE_COLLECTIONS = {
+    "company-sent-rows": "company_sent_rows",
+    "company-arrived-rows": "company_arrived_rows",
+}
+
+
+def line_collection(name: str):
+    coll = LINE_COLLECTIONS.get(name)
+    if not coll:
+        raise HTTPException(status_code=404, detail="Unknown sheet")
+    return db[coll]
+
+
+@api_router.get("/line-sheet/{sheet}", response_model=List[LineRow])
+async def list_line_rows(sheet: str):
+    coll = line_collection(sheet)
+    docs = await coll.find().sort([("row_index", 1), ("created_at", 1)]).to_list(10000)
+    return [LineRow.from_mongo(d) for d in docs]
+
+
+@api_router.post("/line-sheet/{sheet}/bulk")
+async def save_line_rows(sheet: str, payload: BulkLineRows):
+    coll = line_collection(sheet)
+    saved = []
+    for i, r in enumerate(payload.rows):
+        if is_blank_line(r):
+            if r.id:
+                await coll.delete_one({"_id": oid(r.id)})
+            continue
+        data = r.model_dump(exclude={"id"})
+        if r.id:
+            await coll.update_one({"_id": oid(r.id)}, {"$set": data})
+            saved.append({"index": i, "id": r.id})
+        else:
+            data["created_at"] = now_iso()
+            res = await coll.insert_one(data)
+            saved.append({"index": i, "id": str(res.inserted_id)})
+    return {"saved": saved}
+
+
+@api_router.post("/line-sheet/{sheet}/replace")
+async def replace_line_rows(sheet: str, payload: BulkLineRows):
+    coll = line_collection(sheet)
+    docs = []
+    for i, r in enumerate(payload.rows):
+        if is_blank_line(r):
+            continue
+        data = r.model_dump(exclude={"id"})
+        data["row_index"] = i
+        data["created_at"] = now_iso()
+        docs.append(data)
+    await coll.delete_many({})
+    if docs:
+        await coll.insert_many(docs)
+    return {"count": len(docs)}
+
+
+@api_router.delete("/line-sheet/{sheet}/{row_id}")
+async def delete_line_row(sheet: str, row_id: str):
+    coll = line_collection(sheet)
+    await coll.delete_one({"_id": oid(row_id)})
+    return {"ok": True}
+
+
+@api_router.get("/company-balance")
+async def company_balance():
+    sent = await db.company_sent_rows.find().to_list(20000)
+    arrived = await db.company_arrived_rows.find().to_list(20000)
+
+    agg = {}
+
+    def key_of(r):
+        return (
+            str(r.get("group", "")).strip().upper(),
+            str(r.get("item", "")).strip().upper(),
+            str(r.get("shade", "")).strip(),
+        )
+
+    for r in sent:
+        if not str(r.get("item", "")).strip():
+            continue
+        e = agg.setdefault(key_of(r), {
+            "group": str(r.get("group", "")).strip(), "item": str(r.get("item", "")).strip(),
+            "shade": str(r.get("shade", "")).strip(), "sent_qty": 0, "arrived_qty": 0,
+        })
+        e["sent_qty"] += r.get("quantity") or 0
+
+    for r in arrived:
+        if not str(r.get("item", "")).strip():
+            continue
+        e = agg.setdefault(key_of(r), {
+            "group": str(r.get("group", "")).strip(), "item": str(r.get("item", "")).strip(),
+            "shade": str(r.get("shade", "")).strip(), "sent_qty": 0, "arrived_qty": 0,
+        })
+        e["arrived_qty"] += r.get("quantity") or 0
+
+    rows = []
+    for e in agg.values():
+        rows.append({**e, "balance_qty": e["sent_qty"] - e["arrived_qty"]})
+    rows.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
+    return {
+        "rows": rows,
+        "total_sent": sum(r["sent_qty"] for r in rows),
+        "total_arrived": sum(r["arrived_qty"] for r in rows),
+        "total_balance": sum(r["balance_qty"] for r in rows),
+        "pending_lines": sum(1 for r in rows if r["balance_qty"] > 0),
     }
 
 

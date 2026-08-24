@@ -4,10 +4,11 @@ import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
 import { SheetContextMenu } from "../components/SheetContextMenu";
+import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { Trash2, Filter } from "lucide-react";
+import { Trash2, Filter, FilterX } from "lucide-react";
 
 export default function StockSheet() {
   const [lookups, setLookups] = useState({ conferences: [], groups: [], items: [], shades: [] });
@@ -55,11 +56,23 @@ export default function StockSheet() {
             Each Item + Shade is one line · click-drag to select a range, then Cmd/Ctrl + C / X / V · drag the blue corner handle to copy a cell down
           </p>
         </div>
-        <div className="flex gap-2 uppercase items-center">
+        <div className="flex gap-2 uppercase items-center flex-wrap">
           <SheetToolbar sheet={sheet} prefix="stock-" />
+          <Input
+            data-testid="stock-global-search"
+            value={sheet.search}
+            onChange={(e) => sheet.setSearch(e.target.value)}
+            placeholder="SEARCH ANY COLUMN"
+            className="h-9 w-52 text-xs"
+          />
           <Button variant="outline" data-testid="stock-toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> FILTERS
+            <Filter className="h-4 w-4 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
           </Button>
+          {sheet.filterCount > 0 && (
+            <Button variant="outline" data-testid="stock-clear-filters-btn" onClick={sheet.clearFilters}>
+              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS
+            </Button>
+          )}
         </div>
       </div>
 
@@ -81,12 +94,12 @@ export default function StockSheet() {
                 <th />
                 {columns.map((c) => (
                   <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
-                    <Input
-                      data-testid={`stock-filter-${c.key}`}
-                      value={sheet.filters[c.key] || ""}
-                      onChange={(e) => sheet.setFilters({ ...sheet.filters, [c.key]: e.target.value })}
-                      placeholder="filter"
-                      className="h-7 text-xs"
+                    <FilterPopover
+                      column={c}
+                      filter={sheet.filters[c.key]}
+                      onChange={(f) => sheet.setFilter(c.key, f)}
+                      rows={sheet.rows}
+                      prefix="stock-"
                     />
                   </th>
                 ))}
@@ -127,7 +140,7 @@ export default function StockSheet() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={2} className="px-2 py-2 text-xs">{sheet.filtered.length} lines shown</td>
+              <td colSpan={2} className="px-2 py-2 text-xs">{sheet.dataCount} lines shown</td>
               <td />
               <td className="px-2 py-2 text-xs text-right mono" data-testid="stock-total-qty">{totalQty}</td>
               <td />

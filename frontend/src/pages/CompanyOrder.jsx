@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useGridFilter } from "../lib/useGridFilter";
+import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { RefreshCw, FileSpreadsheet, FileText } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, FileText, FilterX } from "lucide-react";
 
 const columns = [
   { key: "group", label: "Group Name", width: 160 },
@@ -18,23 +20,15 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function CompanyOrder() {
   const [data, setData] = useState(null);
-  const [filters, setFilters] = useState({});
   const [pendingOnly, setPendingOnly] = useState(true);
+  const grid = useGridFilter(data?.rows || [], columns);
 
   const load = (pending = pendingOnly) =>
     api.companyOrder(pending).then(setData).catch((e) => toast.error(String(e)));
 
   useEffect(() => { load(pendingOnly); }, [pendingOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim());
-    return data.rows.filter((r) =>
-      active.every(([k, v]) => String(r[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
-    );
-  }, [data, filters]);
-
-  const totals = rows.reduce(
+  const totals = grid.visible.reduce(
     (a, r) => ({
       ordered: a.ordered + r.ordered_qty,
       stock: a.stock + r.stock_qty,
@@ -43,9 +37,8 @@ export default function CompanyOrder() {
     { ordered: 0, stock: 0, order: 0 }
   );
 
-  const download = (kind) => {
+  const download = (kind) =>
     window.open(`${API}/company-order/export.${kind}?pending_only=${pendingOnly}`, "_blank");
-  };
 
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
@@ -58,7 +51,19 @@ export default function CompanyOrder() {
             What must be ordered from the company to fulfil every conference order (ordered qty − in house stock)
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 uppercase">
+        <div className="flex flex-wrap gap-2 uppercase items-center">
+          <Input
+            data-testid="company-global-search"
+            value={grid.search}
+            onChange={(e) => grid.setSearch(e.target.value)}
+            placeholder="SEARCH ANY COLUMN"
+            className="h-9 w-52 text-xs"
+          />
+          {grid.activeCount > 0 && (
+            <Button variant="outline" data-testid="company-clear-filters-btn" onClick={grid.clearAll}>
+              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS ({grid.activeCount})
+            </Button>
+          )}
           <Button
             variant={pendingOnly ? "default" : "outline"}
             data-testid="pending-only-btn"
@@ -105,6 +110,7 @@ export default function CompanyOrder() {
                   style={{ width: c.width, minWidth: c.width }}
                 >
                   {c.label}
+                  {grid.sort?.key === c.key && (grid.sort.dir === "asc" ? " ↑" : " ↓")}
                 </th>
               ))}
             </tr>
@@ -112,26 +118,28 @@ export default function CompanyOrder() {
               <th />
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
-                  <Input
-                    data-testid={`company-filter-${c.key}`}
-                    value={filters[c.key] || ""}
-                    onChange={(e) => setFilters({ ...filters, [c.key]: e.target.value })}
-                    placeholder="filter"
-                    className="h-7 text-xs"
+                  <FilterPopover
+                    column={c}
+                    filter={grid.filters[c.key]}
+                    onChange={(f) => grid.setFilter(c.key, f)}
+                    rows={data.rows}
+                    sort={grid.sort}
+                    onSort={grid.setSort}
+                    prefix="company-"
                   />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {grid.visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="p-4 text-sm text-muted-foreground">
                   Nothing to order — in house stock covers every conference order.
                 </td>
               </tr>
             )}
-            {rows.map((r, i) => (
+            {grid.visible.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
                 className="row-hover bg-white"
@@ -157,7 +165,7 @@ export default function CompanyOrder() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#3F6F52] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={3} className="px-2 py-2 text-xs">{rows.length} lines shown</td>
+              <td colSpan={3} className="px-2 py-2 text-xs">{grid.visible.length} lines shown</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="company-total-ordered">{totals.ordered}</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="company-total-stock">{totals.stock}</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="company-total-to-order">{totals.order}</td>

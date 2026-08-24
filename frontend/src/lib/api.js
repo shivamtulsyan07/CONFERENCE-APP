@@ -24,6 +24,12 @@ export const api = {
   orderSummary: () => http.get("/order-summary").then((r) => r.data),
   companyOrder: (pendingOnly = false) =>
     http.get("/company-order", { params: { pending_only: pendingOnly } }).then((r) => r.data),
+
+  lineRows: (sheet) => http.get(`/line-sheet/${sheet}`).then((r) => r.data),
+  saveLineRows: (sheet, rows) => http.post(`/line-sheet/${sheet}/bulk`, { rows }).then((r) => r.data),
+  replaceLineRows: (sheet, rows) => http.post(`/line-sheet/${sheet}/replace`, { rows }).then((r) => r.data),
+  deleteLineRow: (sheet, id) => http.delete(`/line-sheet/${sheet}/${id}`).then((r) => r.data),
+  companyBalance: () => http.get("/company-balance").then((r) => r.data),
   stats: () => http.get("/stats/dashboard").then((r) => r.data),
   seed: () => http.post("/seed").then((r) => r.data),
 };

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { api, errMsg } from "../lib/api";
+import { useEffect, useState } from "react";
+import { api } from "../lib/api";
+import { useGridFilter } from "../lib/useGridFilter";
+import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, FilterX } from "lucide-react";
 
 const columns = [
   { key: "group", label: "Group Name", width: 170 },
@@ -14,20 +16,12 @@ const columns = [
 
 export default function OrderSummary() {
   const [data, setData] = useState(null);
-  const [filters, setFilters] = useState({});
+  const grid = useGridFilter(data?.rows || [], columns);
 
-  const load = () => api.orderSummary().then(setData).catch((e) => toast.error(errMsg(e)));
+  const load = () => api.orderSummary().then(setData).catch((e) => toast.error(String(e)));
   useEffect(() => { load(); }, []);
 
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim());
-    return data.rows.filter((r) =>
-      active.every(([k, v]) => String(r[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
-    );
-  }, [data, filters]);
-
-  const totalQty = rows.reduce((a, r) => a + r.quantity, 0);
+  const totalQty = grid.visible.reduce((a, r) => a + r.quantity, 0);
 
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
@@ -40,7 +34,19 @@ export default function OrderSummary() {
             Item-wise total ordered quantity, grouped by Group + Item + Shade
           </p>
         </div>
-        <div className="uppercase">
+        <div className="flex flex-wrap gap-2 uppercase items-center">
+          <Input
+            data-testid="summary-global-search"
+            value={grid.search}
+            onChange={(e) => grid.setSearch(e.target.value)}
+            placeholder="SEARCH ANY COLUMN"
+            className="h-9 w-52 text-xs"
+          />
+          {grid.activeCount > 0 && (
+            <Button variant="outline" data-testid="summary-clear-filters-btn" onClick={grid.clearAll}>
+              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS ({grid.activeCount})
+            </Button>
+          )}
           <Button variant="outline" data-testid="refresh-summary-btn" onClick={load}>
             <RefreshCw className="h-4 w-4 mr-1" /> REFRESH
           </Button>
@@ -61,6 +67,7 @@ export default function OrderSummary() {
                   style={{ width: c.width, minWidth: c.width }}
                 >
                   {c.label}
+                  {grid.sort?.key === c.key && (grid.sort.dir === "asc" ? " ↑" : " ↓")}
                 </th>
               ))}
             </tr>
@@ -68,26 +75,28 @@ export default function OrderSummary() {
               <th />
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
-                  <Input
-                    data-testid={`summary-filter-${c.key}`}
-                    value={filters[c.key] || ""}
-                    onChange={(e) => setFilters({ ...filters, [c.key]: e.target.value })}
-                    placeholder="filter"
-                    className="h-7 text-xs"
+                  <FilterPopover
+                    column={c}
+                    filter={grid.filters[c.key]}
+                    onChange={(f) => grid.setFilter(c.key, f)}
+                    rows={data.rows}
+                    sort={grid.sort}
+                    onSort={grid.setSort}
+                    prefix="summary-"
                   />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {grid.visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="p-4 text-sm text-muted-foreground">
                   Nothing to show.
                 </td>
               </tr>
             )}
-            {rows.map((r, i) => (
+            {grid.visible.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
                 className="row-hover bg-white"
@@ -113,7 +122,7 @@ export default function OrderSummary() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={3} className="px-2 py-2 text-xs">{rows.length} lines shown</td>
+              <td colSpan={3} className="px-2 py-2 text-xs">{grid.visible.length} lines shown</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="summary-total-qty">{totalQty}</td>
             </tr>
           </tfoot>

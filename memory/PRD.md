@@ -36,6 +36,11 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - Company Order page (/company-order): what to order from the company = ordered qty − in house stock per Group+Item+Shade, "shortage only / all items" toggle, filters, totals, and Excel (openpyxl) + PDF (reportlab) export via GET /api/company-order/export.xlsx|.pdf?pending_only=.
 
+- Advanced filters on every grid (lib/filters.js + components/FilterPopover.jsx + lib/useGridFilter.js): per-column operator filters (contains / not contains / equals / starts / ends / empty / not empty; numeric = ≠ > ≥ < ≤ between), multi-select value picklist with search, ASC/DESC sort on read-only grids, global "search any column" box, active-filter count and CLEAR FILTERS.
+
+- Company Balance Order (/company-balance) + Stock Arrived From Company (/stock-arrived): shared editable LineSheet component over collections `company_sent_rows` and `company_arrived_rows` (Group, Item, Shade, Quantity, Date, Remark). GET /api/company-balance nets sent − arrived per Group+Item+Shade; Company Balance Order shows read-only ARRIVED and BALANCE columns plus stat cards. Endpoints: /api/line-sheet/{company-sent-rows|company-arrived-rows} (GET, /bulk, /replace, DELETE).
+- Footer counts exclude the trailing blank sentinel row (sheet.dataCount).
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

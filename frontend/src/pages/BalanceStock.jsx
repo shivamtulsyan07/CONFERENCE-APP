@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, errMsg } from "../lib/api";
+import { useGridFilter } from "../lib/useGridFilter";
+import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, FilterX } from "lucide-react";
 
 const columns = [
   { key: "group", label: "Group Name", width: 150 },
@@ -16,23 +18,16 @@ const columns = [
 
 export default function BalanceStock() {
   const [data, setData] = useState(null);
-  const [filters, setFilters] = useState({});
   const [onlyShort, setOnlyShort] = useState(false);
+  const grid = useGridFilter(
+    (data?.rows || []).filter((r) => (onlyShort ? r.balance < 0 : true)),
+    columns
+  );
 
   const load = () => api.balanceStock().then(setData).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);
 
-  const rows = useMemo(() => {
-    if (!data) return [];
-    const active = Object.entries(filters).filter(([, v]) => v && v.trim());
-    return data.rows
-      .filter((r) => (onlyShort ? r.balance < 0 : true))
-      .filter((r) =>
-        active.every(([k, v]) => String(r[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
-      );
-  }, [data, filters, onlyShort]);
-
-  const totals = rows.reduce(
+  const totals = grid.visible.reduce(
     (a, r) => ({
       stock: a.stock + r.stock_qty,
       ordered: a.ordered + r.ordered_qty,
@@ -52,7 +47,19 @@ export default function BalanceStock() {
             In House Stock quantity minus Conference Order quantity, matched on Group + Item + Shade · red means short
           </p>
         </div>
-        <div className="flex gap-2 uppercase">
+        <div className="flex flex-wrap gap-2 uppercase items-center">
+          <Input
+            data-testid="balance-global-search"
+            value={grid.search}
+            onChange={(e) => grid.setSearch(e.target.value)}
+            placeholder="SEARCH ANY COLUMN"
+            className="h-9 w-52 text-xs"
+          />
+          {grid.activeCount > 0 && (
+            <Button variant="outline" data-testid="balance-clear-filters-btn" onClick={grid.clearAll}>
+              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS ({grid.activeCount})
+            </Button>
+          )}
           <Button
             variant={onlyShort ? "default" : "outline"}
             data-testid="only-short-btn"
@@ -80,6 +87,7 @@ export default function BalanceStock() {
                   style={{ width: c.width, minWidth: c.width }}
                 >
                   {c.label}
+                  {grid.sort?.key === c.key && (grid.sort.dir === "asc" ? " ↑" : " ↓")}
                 </th>
               ))}
             </tr>
@@ -87,26 +95,28 @@ export default function BalanceStock() {
               <th />
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
-                  <Input
-                    data-testid={`balance-filter-${c.key}`}
-                    value={filters[c.key] || ""}
-                    onChange={(e) => setFilters({ ...filters, [c.key]: e.target.value })}
-                    placeholder="filter"
-                    className="h-7 text-xs"
+                  <FilterPopover
+                    column={c}
+                    filter={grid.filters[c.key]}
+                    onChange={(f) => grid.setFilter(c.key, f)}
+                    rows={data.rows}
+                    sort={grid.sort}
+                    onSort={grid.setSort}
+                    prefix="balance-"
                   />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {grid.visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length + 1} className="p-4 text-sm text-muted-foreground">
                   Nothing to show.
                 </td>
               </tr>
             )}
-            {rows.map((r, i) => (
+            {grid.visible.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
                 className="row-hover"
@@ -124,7 +134,7 @@ export default function BalanceStock() {
                     } ${c.key === "balance" ? (r.balance < 0 ? "text-destructive font-semibold" : "font-semibold") : ""}`}
                     data-testid={`balance-cell-${i}-${c.key}`}
                   >
-                    {r[c.key] === "" ? "—" : r[c.key]}
+                    {String(r[c.key] ?? "").trim() === "" ? "—" : r[c.key]}
                   </td>
                 ))}
               </tr>
@@ -133,7 +143,7 @@ export default function BalanceStock() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={3} className="px-2 py-2 text-xs">{rows.length} lines shown</td>
+              <td colSpan={3} className="px-2 py-2 text-xs">{grid.visible.length} lines shown</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total-stock">{totals.stock}</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total-ordered">{totals.ordered}</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total">{totals.balance}</td>
