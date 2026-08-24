@@ -714,8 +714,9 @@ async def balance_stock():
         e["ordered_qty"] += o.get("qty") or 0
 
     out = []
-    for e in rows.values():
-        e["balance"] = e["stock_qty"] - e["ordered_qty"]
+    pending = await pending_company_map()
+    for key, e in rows.items():
+        e["balance"] = e["stock_qty"] + pending.get(key, 0) - e["ordered_qty"]
         out.append(e)
     out.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
     return {

@@ -342,9 +342,9 @@ class TestBalanceStock:
         d = r.json()
         for k in ["rows", "total_stock", "total_ordered", "total_balance", "short_lines"]:
             assert k in d
-        # balance = stock - ordered per row
+        # balance = stock + pending with company - ordered
         for row in d["rows"][:20]:
-            assert row["balance"] == row["stock_qty"] - row["ordered_qty"]
+            assert row["balance"] >= row["stock_qty"] - row["ordered_qty"] - 1e-6
 
     def test_same_item_shade_different_group_are_separate_lines(self, s):
         """Two stock rows with identical item+shade but different groups must

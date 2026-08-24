@@ -43,7 +43,7 @@ export default function BalanceStock() {
     <SheetFrame
       testId="balance-stock-page"
       title="Balance Stock"
-      subtitle="In House Stock minus Conference Order, matched on Group + Item + Shade · red means short"
+      subtitle="In House Stock plus order pending with the company, minus Conference Order (Group + Item + Shade) · red means short"
       actions={
         <>
           <Input

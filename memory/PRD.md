@@ -57,6 +57,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 **Shop Sale module** (`/shop-sale`, under the SHOP rail): columns Party Name, Bill No, Group Name, Item, Shade, Qty (no date/remark), backed by the new `shop_sale_rows` collection registered in `LINE_COLLECTIONS` as `shop-sale-rows`. `LineRow`/`LineRowIn` gained `party_name` + `bill_no`, `is_blank_line` counts them, and `LineSheet` gained `leadColumns` / `omitColumns` props. Stat strip shows sale lines, quantity sold and distinct bills. Deliberately does NOT affect stock, Company Order or the dashboard. Verified: iteration_13 (backend 56/56 incl. 12 new Shop Sale tests, frontend all checks pass, CB/SA regression clean).
 
+- 2026-06 Balance Stock formula updated at user request: **balance = in house stock + qty pending with the company (sent − arrived) − conference order** (`/api/balance-stock` now uses `pending_company_map()`); no new column, only the number changed. Company Order keeps its own logic (demand − stock − pending).
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).
