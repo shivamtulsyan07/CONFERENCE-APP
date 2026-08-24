@@ -169,20 +169,39 @@ async def list_order_rows():
     return [OrderRow.from_mongo(d) for d in docs]
 
 
-@api_router.post("/order-rows/bulk", response_model=List[OrderRow])
+@api_router.post("/order-rows/bulk")
 async def save_order_rows(payload: BulkOrderRows):
-    for r in payload.rows:
+    saved = []
+    for i, r in enumerate(payload.rows):
         if is_blank_order(r):
             continue
         data = r.model_dump(exclude={"id"})
-        if r.qty and r.rate and not r.amount:
-            data["amount"] = r.qty * r.rate
+        data["amount"] = (r.qty or 0) * (r.rate or 0)
         if r.id:
             await db.order_rows.update_one({"_id": oid(r.id)}, {"$set": data})
+            saved.append({"index": i, "id": r.id})
         else:
             data["created_at"] = now_iso()
-            await db.order_rows.insert_one(data)
-    return await list_order_rows()
+            res = await db.order_rows.insert_one(data)
+            saved.append({"index": i, "id": str(res.inserted_id)})
+    return {"saved": saved}
+
+
+@api_router.post("/order-rows/replace")
+async def replace_order_rows(payload: BulkOrderRows):
+    docs = []
+    for i, r in enumerate(payload.rows):
+        if is_blank_order(r):
+            continue
+        data = r.model_dump(exclude={"id"})
+        data["amount"] = (r.qty or 0) * (r.rate or 0)
+        data["row_index"] = i
+        data["created_at"] = now_iso()
+        docs.append(data)
+    await db.order_rows.delete_many({})
+    if docs:
+        await db.order_rows.insert_many(docs)
+    return {"count": len(docs)}
 
 
 @api_router.delete("/order-rows/{row_id}")
@@ -196,13 +215,21 @@ async def auto_status():
     stock = await db.stock_rows.find().to_list(5000)
     available = {}
     for s in stock:
-        key = (s.get("item", "").strip().upper(), str(s.get("shade", "")).strip())
+        key = (
+            str(s.get("group", "")).strip().upper(),
+            s.get("item", "").strip().upper(),
+            str(s.get("shade", "")).strip(),
+        )
         available[key] = available.get(key, 0) + (s.get("quantity") or 0)
 
     updated = 0
     rows = await db.order_rows.find().to_list(5000)
     for r in rows:
-        key = (r.get("item", "").strip().upper(), str(r.get("shade", "")).strip())
+        key = (
+            str(r.get("group", "")).strip().upper(),
+            r.get("item", "").strip().upper(),
+            str(r.get("shade", "")).strip(),
+        )
         have = available.get(key, 0)
         need = r.get("qty") or 0
         if have <= 0:
@@ -224,18 +251,38 @@ async def list_stock_rows():
     return [StockRow.from_mongo(d) for d in docs]
 
 
-@api_router.post("/stock-rows/bulk", response_model=List[StockRow])
+@api_router.post("/stock-rows/bulk", response_model=None)
+@api_router.post("/stock-rows/bulk")
 async def save_stock_rows(payload: BulkStockRows):
-    for r in payload.rows:
+    saved = []
+    for i, r in enumerate(payload.rows):
         if is_blank_stock(r):
             continue
         data = r.model_dump(exclude={"id"})
         if r.id:
             await db.stock_rows.update_one({"_id": oid(r.id)}, {"$set": data})
+            saved.append({"index": i, "id": r.id})
         else:
             data["created_at"] = now_iso()
-            await db.stock_rows.insert_one(data)
-    return await list_stock_rows()
+            res = await db.stock_rows.insert_one(data)
+            saved.append({"index": i, "id": str(res.inserted_id)})
+    return {"saved": saved}
+
+
+@api_router.post("/stock-rows/replace")
+async def replace_stock_rows(payload: BulkStockRows):
+    docs = []
+    for i, r in enumerate(payload.rows):
+        if is_blank_stock(r):
+            continue
+        data = r.model_dump(exclude={"id"})
+        data["row_index"] = i
+        data["created_at"] = now_iso()
+        docs.append(data)
+    await db.stock_rows.delete_many({})
+    if docs:
+        await db.stock_rows.insert_many(docs)
+    return {"count": len(docs)}
 
 
 @api_router.delete("/stock-rows/{row_id}")
@@ -267,6 +314,29 @@ async def lookups():
     }
 
 
+# ---------- Conference order summary ----------
+@api_router.get("/order-summary")
+async def order_summary():
+    orders = await db.order_rows.find().to_list(5000)
+    agg = {}
+    for o in orders:
+        item = str(o.get("item", "")).strip()
+        if not item:
+            continue
+        group = str(o.get("group", "")).strip()
+        shade = str(o.get("shade", "")).strip()
+        key = (group.upper(), item.upper(), shade)
+        e = agg.setdefault(key, {"group": group, "item": item, "shade": shade, "quantity": 0, "rows": 0})
+        e["quantity"] += o.get("qty") or 0
+        e["rows"] += 1
+    out = sorted(agg.values(), key=lambda x: (x["group"], x["item"], x["shade"]))
+    return {
+        "rows": out,
+        "total_quantity": sum(r["quantity"] for r in out),
+        "total_lines": len(out),
+    }
+
+
 # ---------- Balance stock ----------
 @api_router.get("/balance-stock")
 async def balance_stock():
@@ -275,36 +345,30 @@ async def balance_stock():
 
     rows = {}
 
-    def entry(item, shade, conference="", group=""):
-        key = (item.strip().upper(), str(shade).strip())
-        e = rows.setdefault(key, {
-            "item": item.strip(), "shade": str(shade).strip(),
-            "conference": conference, "group": group,
+    def entry(item, shade, group=""):
+        key = (str(group).strip().upper(), item.strip().upper(), str(shade).strip())
+        return rows.setdefault(key, {
+            "group": str(group).strip(), "item": item.strip(), "shade": str(shade).strip(),
             "stock_qty": 0, "ordered_qty": 0,
         })
-        if conference and not e["conference"]:
-            e["conference"] = conference
-        if group and not e["group"]:
-            e["group"] = group
-        return e
 
     for s in stock:
         if not str(s.get("item", "")).strip():
             continue
-        e = entry(s.get("item", ""), s.get("shade", ""), s.get("conference", ""), s.get("group", ""))
+        e = entry(s.get("item", ""), s.get("shade", ""), s.get("group", ""))
         e["stock_qty"] += s.get("quantity") or 0
 
     for o in orders:
         if not str(o.get("item", "")).strip():
             continue
-        e = entry(o.get("item", ""), o.get("shade", ""), o.get("conference", ""), o.get("group", ""))
+        e = entry(o.get("item", ""), o.get("shade", ""), o.get("group", ""))
         e["ordered_qty"] += o.get("qty") or 0
 
     out = []
     for e in rows.values():
         e["balance"] = e["stock_qty"] - e["ordered_qty"]
         out.append(e)
-    out.sort(key=lambda x: (x["item"], x["shade"]))
+    out.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
     return {
         "rows": out,
         "total_stock": sum(r["stock_qty"] for r in out),

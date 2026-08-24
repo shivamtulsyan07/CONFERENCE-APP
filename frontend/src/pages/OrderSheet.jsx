@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errMsg, money, STATUS_META } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
+import { SheetToolbar } from "../components/SheetToolbar";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { Save, Trash2, Wand2, Filter } from "lucide-react";
+import { Trash2, Wand2, Filter } from "lucide-react";
 
 export default function OrderSheet() {
   const [lookups, setLookups] = useState({ parties: [], conferences: [], groups: [], items: [], shades: [], bill_nos: [], party_pages: {} });
@@ -35,16 +36,18 @@ export default function OrderSheet() {
     rows.map((r) => ({ ...r, qty: r.qty || "", rate: r.rate || "", amount: r.amount || "" }));
 
   const load = useCallback(() => api.orderRows().then(blankZeros), []);
-  const save = useCallback((rows) => api.saveOrderRows(rows.map((r) => ({
+  const normalize = (r) => ({
     ...r,
     page: String(r.page ?? ""),
     shade: String(r.shade ?? ""),
     qty: Number(r.qty) || 0,
     rate: Number(r.rate) || 0,
-    amount: (Number(r.qty) || 0) * (Number(r.rate) || 0),
-  }))).then(blankZeros), []);
+  });
 
-  const sheet = useSheet({ columns, load, save, remove: api.deleteOrderRow, blankRow, minRows: 15 });
+  const saveRows = useCallback((rows) => api.saveOrderRows(rows.map(normalize)), []);
+  const replaceRows = useCallback((rows) => api.replaceOrderRows(rows.map(normalize)), []);
+
+  const sheet = useSheet({ columns, load, save: saveRows, replace: replaceRows, remove: api.deleteOrderRow, blankRow, minRows: 15 });
 
   const onCell = (idx, col, value) => {
     if (col.key === "party_name") {
@@ -55,13 +58,7 @@ export default function OrderSheet() {
     sheet.setCell(idx, col.key, value);
   };
 
-  const handleSave = async () => {
-    try {
-      const r = await sheet.persist();
-      toast.success(r.saved ? `${r.saved} row(s) saved` : "Nothing to save");
-      api.lookups().then(setLookups);
-    } catch (e) { toast.error(errMsg(e)); }
-  };
+  const handleSave = () => sheet.flush();
 
   const cycleStatus = (idx) => {
     const order = ["not_ready", "arrived", "ready"];
@@ -91,20 +88,16 @@ export default function OrderSheet() {
         <div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Order</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the SR number to change row colour
+            Type and Tab/Enter like Excel · drag the blue corner handle to copy a cell down · paste from a spreadsheet · click the SR number to change row colour
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 uppercase">
+        <div className="flex flex-wrap gap-2 uppercase items-center">
+          <SheetToolbar sheet={sheet} />
           <Button variant="outline" data-testid="toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
             <Filter className="h-4 w-4 mr-1" /> FILTERS
           </Button>
           <Button variant="outline" data-testid="auto-status-btn" onClick={autoMark}>
-            <Wand2 className="h-4 w-4 mr-1" /> AUTO COLOUR FROM IN HOUSE STOCK
-          </Button>
-          <Button data-testid="save-sheet-btn" onClick={handleSave} disabled={sheet.saving}>
-            <Save className="h-4 w-4 mr-1" />
-            {sheet.saving ? "SAVING…" : `SAVE${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
-          </Button>
+            <Wand2 className="h-4 w-4 mr-1" /> AUTO COLOUR FROM IN HOUSE STOCK          </Button>
         </div>
       </div>
 
@@ -170,6 +163,7 @@ export default function OrderSheet() {
                     rowIndex={idx}
                     colIndex={ci}
                     inputs={sheet.inputs}
+                    sheet={sheet}
                     testId={`cell-${idx}-${c.key}`}
                     onChange={(v) => onCell(idx, c, v)}
                     onKeyDown={sheet.onKeyDown}

@@ -21,6 +21,24 @@
     background-color: hsl(var(--muted));
 }
 
+.sheet-fill-handle {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    height: 9px;
+    width: 9px;
+    background: #0066ff;
+    border: 1px solid #fff;
+    cursor: crosshair;
+    opacity: 0;
+    transition: opacity 150ms ease;
+    z-index: 5;
+}
+td:hover > .sheet-fill-handle,
+td:focus-within > .sheet-fill-handle {
+    opacity: 1;
+}
+
 @keyframes rise {
     from {
         opacity: 0;

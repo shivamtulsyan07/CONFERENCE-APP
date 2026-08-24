@@ -10,15 +10,18 @@ export const api = {
 
   orderRows: () => http.get("/order-rows").then((r) => r.data),
   saveOrderRows: (rows) => http.post("/order-rows/bulk", { rows }).then((r) => r.data),
+  replaceOrderRows: (rows) => http.post("/order-rows/replace", { rows }).then((r) => r.data),
   deleteOrderRow: (id) => http.delete(`/order-rows/${id}`).then((r) => r.data),
   autoStatus: () => http.post("/order-rows/auto-status").then((r) => r.data),
 
   stockRows: () => http.get("/stock-rows").then((r) => r.data),
   saveStockRows: (rows) => http.post("/stock-rows/bulk", { rows }).then((r) => r.data),
+  replaceStockRows: (rows) => http.post("/stock-rows/replace", { rows }).then((r) => r.data),
   deleteStockRow: (id) => http.delete(`/stock-rows/${id}`).then((r) => r.data),
 
   lookups: () => http.get("/lookups").then((r) => r.data),
   balanceStock: () => http.get("/balance-stock").then((r) => r.data),
+  orderSummary: () => http.get("/order-summary").then((r) => r.data),
   stats: () => http.get("/stats/dashboard").then((r) => r.data),
   seed: () => http.post("/seed").then((r) => r.data),
 };

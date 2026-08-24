@@ -24,7 +24,13 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - Balance Stock page (/balance): read-only sheet = stock qty − ordered qty matched on Item+Shade; green surplus, red short, "Short only" toggle, filters, footer totals. Endpoint GET /api/balance-stock.
 
+- Conference Order Summary page (/summary): item-wise totals (Group Name, Item Name, Shade, Quantity) from GET /api/order-summary, with filters and total.
+- Excel-style drag-to-fill: blue handle at each cell's bottom-right, hold and drag down/up to copy the value into the range (single undo step).
+- Sheet names: Conference Order (/orders), In House Stock (/stock), Balance Stock (/balance), Order Summary (/summary).
+
 ## Backlog
+- Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
+- Conference Name removed from In House Order and Balance Stock (Group Name kept).
 - P1: Bill-wise view / print of a party's sheet; export to Excel/CSV
 - P1: auto-status should net off demand across rows sharing the same Item+Shade
 - P2: undo/redo, multi-cell selection & fill-down, row grouping by party

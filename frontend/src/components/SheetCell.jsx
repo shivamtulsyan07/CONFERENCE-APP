@@ -8,12 +8,17 @@ export const SheetCell = ({
   onPaste,
   inputs,
   testId,
+  sheet,
 }) => {
   const listId = column.options ? `dl-${column.key}` : undefined;
+  const inFill = sheet?.isInFill?.(rowIndex, colIndex);
   return (
     <td
-      className="border-r border-b border-[#c9d3e0] p-0 align-middle"
+      className={`relative border-r border-b border-[#c9d3e0] p-0 align-middle ${
+        inFill ? "ring-2 ring-inset ring-[#0066FF]/60" : ""
+      }`}
       style={{ width: column.width, minWidth: column.width }}
+      onMouseEnter={() => sheet?.fillOver?.(rowIndex)}
     >
       <input
         ref={(el) => { if (el) inputs.current[`${rowIndex}-${colIndex}`] = el; }}
@@ -27,6 +32,17 @@ export const SheetCell = ({
           column.numeric ? "text-right" : ""
         } ${column.upper ? "uppercase" : ""}`}
       />
+      {sheet?.fillStart && (
+        <span
+          data-testid={`fill-handle-${rowIndex}-${column.key}`}
+          title="Drag to copy down"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            sheet.fillStart(rowIndex, colIndex, column.key, value ?? "");
+          }}
+          className="sheet-fill-handle"
+        />
+      )}
     </td>
   );
 };

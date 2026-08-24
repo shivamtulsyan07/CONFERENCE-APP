@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 3 verified the new autosave + undo/redo + replace-endpoint contract end-to-end. Rewrote /app/backend/tests/backend_test.py against the new bulk contract {saved:[{index,id}]}, the new /replace endpoints (snapshot+restore to avoid wiping real user data), and the group+item+shade keying for auto-status and balance-stock. 18/18 backend tests pass when run serially (pytest -n 0). Frontend Playwright validated: (a) typing autosaves within ~1s (SAVING SOON… -> SAVED) with no duplicate row on subsequent edits, (b) Ctrl+Z undoes, undone state persists on server, (c) Ctrl+R redoes without reloading the page and Ctrl+Shift+Z also redoes, (d) after a fresh reload UNDO/REDO buttons are disabled, (e) SR click cycles WHITE -> YELLOW row colour, (f) delete-row via UI removes the row and Ctrl+Z restores it, (g) In House Order sheet has only Group/Item/Shade/Quantity columns (no Conference), autosave+undo+delete work, (h) Balance Stock lists two lines for same item+shade in different groups (they do NOT net), balance is stock-ordered, SHORT ONLY toggle filters correctly, red row for negative balance, (i) sidebar nav labels rendered uppercase via CSS text-transform, mobile 390px shows menu toggle and dashboard stats.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/stock-rows", "issue": "StockRow model still carries a 'conference' field in server.py even though iteration 3 spec removed the Conference column from In House Order. Existing DB documents may still have this key; UI ignores it, tests do not assert against it. Consider removing from the model/BulkStockRows for cleanliness."},
+      {"endpoint": "POST /api/order-rows/auto-status", "issue": "Aggregates stock per (group,item,shade) but does not deduct per-order demand across rows sharing the same key, so multiple order rows contending for the same limited stock can both flip to 'ready'. Confirmed via test that first row (need<=have) is ready and third (need>have) is arrived; product decision, not a defect."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Remove the vestigial 'conference' field from StockRow / StockRowIn in server.py to match the iteration 3 spec.",
+    "Note in docs that backend_test.py must be run with `pytest -n 0` because TestReplaceEndpoints wipes the shared collection and races with parallel workers under the pinned `-n 2 --dist loadscope` addopts. Non-blocking (all tests pass serially)."
+  ],
+  "critical_code_review_comments": [
+    "useSheet.step() calls pushWhole() which fires POST /replace on every undo/redo. On very large sheets (812 rows already exist), each keystroke undo re-inserts the entire collection. Consider a diff-based approach or debounce.",
+    "useSheet.pushHistory() snapshots the whole rows array before every applyPatch. Over long editing sessions this is O(N*history) memory (capped at 200 entries) — fine now, worth watching.",
+    "server.py auto_status endpoint aggregates stock but does not subtract already-satisfied order demand — two rows needing the same shade both get 'ready' if have >= each individual need. Document as intentional or fix.",
+    "server.py StockRow still has 'conference' although the iteration 3 spec removed it from the sheet; the field is silently ignored by the new UI but persisted on write from any stale client."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (rewritten for new bulk contract, added replace-endpoint snapshot/restore tests, group+item+shade auto-status test, group-differentiated balance-stock test)"
+  ],
+  "success_rate": {"backend": "100% (18/18 serial)", "frontend": "100% of executed flows"},
+  "test_credentials": "N/A - no auth in app",
+  "seed_data_creation": "Backend tests use QA_ prefix rows/stock and clean up individually. Replace-endpoint tests snapshot GET /order-rows and /stock-rows and restore afterwards. Playwright tests use PW_ prefix and clean up. Real user data (812 order rows) preserved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Endpoints (iteration 3): POST /api/order-rows/bulk and /api/stock-rows/bulk return {saved:[{index,id}]}. POST /api/order-rows/replace and /api/stock-rows/replace WIPE the whole collection and reinsert -- if you write tests that call /replace with arbitrary payloads you MUST snapshot GET first and restore in a finally: block (there is real user data in the DB). Auto-status and balance-stock now key on Group+Item+Shade. Stock rows have no Conference column in the UI. Backend tests must be run with `pytest -n 0` because the pinned xdist config in /app/backend/pytest.ini (`-n 2 --dist loadscope`) races with the destructive /replace tests. Frontend testids to remember: cell-<r>-<key>, stock-cell-<r>-<key>, save-status, stock-save-status, undo-btn/redo-btn (plus stock-* variants), status-toggle-<r>, delete-row-<r>, only-short-btn, refresh-balance-btn, auto-status-btn. To add a new blank row in the Conference Order sheet through the UI you must edit the LAST row (useSheet appends a padding row when idx>=len-1); with 812 real rows already present, the safest UI approach is to seed a marker row via POST /api/order-rows/bulk, filter to isolate it, act on it, then delete via API to clean up.",
+  "rca of the issue": "No new bugs. The initial pytest run under xdist -n 2 produced 2 spurious failures (auto-status and blank-rows-skipped) due to TestReplaceEndpoints running on a parallel worker and wiping the stock_rows/order_rows collections mid-test. Diagnosed by inspecting collection counts (813 vs 814) and observing not_ready when 'ready' was expected — matches the exact window when the other worker's /replace call was in-flight. Mitigation: run serially with -n 0; verified 18/18 pass."
+}

@@ -6,75 +6,56 @@ import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 
 const columns = [
-  { key: "group", label: "Group Name", width: 150 },
-  { key: "item", label: "Item", width: 220 },
-  { key: "shade", label: "Shade", width: 110 },
-  { key: "stock_qty", label: "Stock Qty", width: 120, numeric: true },
-  { key: "ordered_qty", label: "Ordered Qty", width: 130, numeric: true },
-  { key: "balance", label: "Balance", width: 120, numeric: true },
+  { key: "group", label: "Group Name", width: 170 },
+  { key: "item", label: "Item Name", width: 260 },
+  { key: "shade", label: "Shade", width: 120 },
+  { key: "quantity", label: "Quantity", width: 130, numeric: true },
 ];
 
-export default function BalanceStock() {
+export default function OrderSummary() {
   const [data, setData] = useState(null);
   const [filters, setFilters] = useState({});
-  const [onlyShort, setOnlyShort] = useState(false);
 
-  const load = () => api.balanceStock().then(setData).catch((e) => toast.error(errMsg(e)));
+  const load = () => api.orderSummary().then(setData).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);
 
   const rows = useMemo(() => {
     if (!data) return [];
     const active = Object.entries(filters).filter(([, v]) => v && v.trim());
-    return data.rows
-      .filter((r) => (onlyShort ? r.balance < 0 : true))
-      .filter((r) =>
-        active.every(([k, v]) => String(r[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
-      );
-  }, [data, filters, onlyShort]);
+    return data.rows.filter((r) =>
+      active.every(([k, v]) => String(r[k] ?? "").toLowerCase().includes(v.trim().toLowerCase()))
+    );
+  }, [data, filters]);
 
-  const totals = rows.reduce(
-    (a, r) => ({
-      stock: a.stock + r.stock_qty,
-      ordered: a.ordered + r.ordered_qty,
-      balance: a.balance + r.balance,
-    }),
-    { stock: 0, ordered: 0, balance: 0 }
-  );
+  const totalQty = rows.reduce((a, r) => a + r.quantity, 0);
 
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
   return (
-    <div data-testid="balance-stock-page">
+    <div data-testid="order-summary-page">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Balance Stock</h1>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Order Summary</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            In House Stock quantity minus Conference Order quantity, matched on Group + Item + Shade · red means short
+            Item-wise total ordered quantity, grouped by Group + Item + Shade
           </p>
         </div>
-        <div className="flex gap-2 uppercase">
-          <Button
-            variant={onlyShort ? "default" : "outline"}
-            data-testid="only-short-btn"
-            onClick={() => setOnlyShort((s) => !s)}
-          >
-            SHORT ONLY ({data.short_lines})
-          </Button>
-          <Button variant="outline" data-testid="refresh-balance-btn" onClick={load}>
+        <div className="uppercase">
+          <Button variant="outline" data-testid="refresh-summary-btn" onClick={load}>
             <RefreshCw className="h-4 w-4 mr-1" /> REFRESH
           </Button>
         </div>
       </div>
 
-      <div className="grid-panel overflow-auto max-h-[72vh]" data-testid="balance-grid">
+      <div className="grid-panel overflow-auto max-h-[72vh] max-w-4xl" data-testid="summary-grid">
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
-            <tr className="bg-[#0A2540] text-white">
-              <th className="w-12 border-r border-[#123a5c] px-2 py-2 text-xs font-semibold">SR</th>
+            <tr className="bg-[#3F6F52] text-white">
+              <th className="w-12 border-r border-[#2f5540] px-2 py-2 text-xs font-semibold">SR</th>
               {columns.map((c) => (
                 <th
                   key={c.key}
-                  className={`border-r border-[#123a5c] px-2 py-2 text-xs font-bold uppercase tracking-wide ${
+                  className={`border-r border-[#2f5540] px-2 py-2 text-xs font-bold uppercase tracking-wide ${
                     c.numeric ? "text-right" : "text-left"
                   }`}
                   style={{ width: c.width, minWidth: c.width }}
@@ -88,7 +69,7 @@ export default function BalanceStock() {
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
                   <Input
-                    data-testid={`balance-filter-${c.key}`}
+                    data-testid={`summary-filter-${c.key}`}
                     value={filters[c.key] || ""}
                     onChange={(e) => setFilters({ ...filters, [c.key]: e.target.value })}
                     placeholder="filter"
@@ -109,9 +90,8 @@ export default function BalanceStock() {
             {rows.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
-                className="row-hover"
-                style={{ background: r.balance < 0 ? "#FDECEA" : r.balance === 0 ? "#FFFFFF" : "#EEF7EA" }}
-                data-testid={`balance-row-${i}`}
+                className="row-hover bg-white"
+                data-testid={`summary-row-${i}`}
               >
                 <td className="border-r border-b border-[#c9d3e0] text-center text-[10px] text-muted-foreground h-8">
                   {i + 1}
@@ -120,11 +100,11 @@ export default function BalanceStock() {
                   <td
                     key={c.key}
                     className={`border-r border-b border-[#c9d3e0] px-2 text-sm mono ${
-                      c.numeric ? "text-right" : ""
-                    } ${c.key === "balance" ? (r.balance < 0 ? "text-destructive font-semibold" : "font-semibold") : ""}`}
-                    data-testid={`balance-cell-${i}-${c.key}`}
+                      c.numeric ? "text-right font-semibold" : ""
+                    }`}
+                    data-testid={`summary-cell-${i}-${c.key}`}
                   >
-                    {r[c.key] === "" ? "—" : r[c.key]}
+                    {String(r[c.key] ?? "").trim() === "" ? "—" : r[c.key]}
                   </td>
                 ))}
               </tr>
@@ -134,9 +114,7 @@ export default function BalanceStock() {
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
               <td colSpan={3} className="px-2 py-2 text-xs">{rows.length} lines shown</td>
-              <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total-stock">{totals.stock}</td>
-              <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total-ordered">{totals.ordered}</td>
-              <td className="px-2 py-2 text-xs text-right mono" data-testid="balance-total">{totals.balance}</td>
+              <td className="px-2 py-2 text-xs text-right mono" data-testid="summary-total-qty">{totalQty}</td>
             </tr>
           </tfoot>
         </table>

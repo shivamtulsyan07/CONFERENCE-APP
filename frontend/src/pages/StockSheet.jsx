@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errMsg } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
+import { SheetToolbar } from "../components/SheetToolbar";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
-import { Save, Trash2, Filter } from "lucide-react";
+import { Trash2, Filter } from "lucide-react";
 
 export default function StockSheet() {
   const [lookups, setLookups] = useState({ conferences: [], groups: [], items: [], shades: [] });
@@ -14,36 +15,29 @@ export default function StockSheet() {
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
   const columns = [
-    { key: "conference", label: "Conference Name", width: 160, options: lookups.conferences, upper: true },
-    { key: "group", label: "Group Name", width: 130, options: lookups.groups, upper: true },
-    { key: "item", label: "Item Name", width: 240, options: lookups.items, upper: true },
+    { key: "group", label: "Group Name", width: 150, options: lookups.groups, upper: true },
+    { key: "item", label: "Item Name", width: 250, options: lookups.items, upper: true },
     { key: "shade", label: "Shade", width: 120 },
-    { key: "quantity", label: "Quantity", width: 110, numeric: true },
+    { key: "quantity", label: "Quantity", width: 120, numeric: true },
   ];
 
-  const blankRow = { conference: "", group: "SH ROLL", item: "", shade: "", quantity: "" };
+  const blankRow = { group: "SH ROLL", item: "", shade: "", quantity: "" };
 
   const blankZeros = (rows) => rows.map((r) => ({ ...r, quantity: r.quantity || "" }));
   const load = useCallback(() => api.stockRows().then(blankZeros), []);
-  const save = useCallback((rows) => api.saveStockRows(rows.map((r) => ({
-    conference: r.conference || "",
+  const normalize = (r) => ({
     group: r.group || "",
     item: r.item || "",
     shade: String(r.shade ?? ""),
     quantity: Number(r.quantity) || 0,
     id: r.id || null,
     row_index: r.row_index ?? 0,
-  }))).then(blankZeros), []);
+  });
 
-  const sheet = useSheet({ columns, load, save, remove: api.deleteStockRow, blankRow, minRows: 15 });
+  const saveRows = useCallback((rows) => api.saveStockRows(rows.map(normalize)), []);
+  const replaceRows = useCallback((rows) => api.replaceStockRows(rows.map(normalize)), []);
 
-  const handleSave = async () => {
-    try {
-      const r = await sheet.persist();
-      toast.success(r.saved ? `${r.saved} row(s) saved` : "Nothing to save");
-      api.lookups().then(setLookups);
-    } catch (e) { toast.error(errMsg(e)); }
-  };
+  const sheet = useSheet({ columns, load, save: saveRows, replace: replaceRows, remove: api.deleteStockRow, blankRow, minRows: 15 });
 
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
@@ -51,18 +45,15 @@ export default function StockSheet() {
     <div data-testid="stock-sheet-page">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">In House Order</h1>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">In House Stock</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Each Item + Shade is one line · paste from Excel · Tab/Enter to move
+            Each Item + Shade is one line · drag the blue corner handle to copy a cell down · paste from Excel · Tab/Enter to move
           </p>
         </div>
-        <div className="flex gap-2 uppercase">
+        <div className="flex gap-2 uppercase items-center">
+          <SheetToolbar sheet={sheet} prefix="stock-" />
           <Button variant="outline" data-testid="stock-toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
             <Filter className="h-4 w-4 mr-1" /> FILTERS
-          </Button>
-          <Button data-testid="save-stock-sheet-btn" onClick={handleSave} disabled={sheet.saving}>
-            <Save className="h-4 w-4 mr-1" />
-            {sheet.saving ? "SAVING…" : `SAVE${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
           </Button>
         </div>
       </div>
@@ -71,7 +62,7 @@ export default function StockSheet() {
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3E6E85] text-white">
-              <th className="w-10 border-r border-[#2c5163] px-2 py-2 text-xs font-semibold">#</th>
+              <th className="w-12 border-r border-[#2c5163] px-2 py-2 text-xs font-semibold">SR</th>
               {columns.map((c) => (
                 <th key={c.key} className="border-r border-[#2c5163] px-2 py-2 text-xs font-bold uppercase tracking-wide text-left"
                   style={{ width: c.width, minWidth: c.width }}>
@@ -112,6 +103,7 @@ export default function StockSheet() {
                     rowIndex={idx}
                     colIndex={ci}
                     inputs={sheet.inputs}
+                    sheet={sheet}
                     testId={`stock-cell-${idx}-${c.key}`}
                     onChange={(v) => sheet.setCell(idx, c.key, v)}
                     onKeyDown={sheet.onKeyDown}
@@ -130,7 +122,7 @@ export default function StockSheet() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={3} className="px-2 py-2 text-xs">{sheet.filtered.length} lines shown</td>
+              <td colSpan={2} className="px-2 py-2 text-xs">{sheet.filtered.length} lines shown</td>
               <td />
               <td className="px-2 py-2 text-xs text-right mono" data-testid="stock-total-qty">{totalQty}</td>
               <td />
