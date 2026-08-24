@@ -8,6 +8,7 @@ import OrderSheet from "@/pages/OrderSheet";
 import StockSheet from "@/pages/StockSheet";
 import BalanceStock from "@/pages/BalanceStock";
 import OrderSummary from "@/pages/OrderSummary";
+import CompanyOrder from "@/pages/CompanyOrder";
 import Parties from "@/pages/Parties";
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Route path="/orders" element={<OrderSheet />} />
             <Route path="/stock" element={<StockSheet />} />
             <Route path="/summary" element={<OrderSummary />} />
+            <Route path="/company-order" element={<CompanyOrder />} />
             <Route path="/balance" element={<BalanceStock />} />
             <Route path="/parties" element={<Parties />} />
           </Route>

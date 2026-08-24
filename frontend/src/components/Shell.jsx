@@ -1,14 +1,15 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Users, Menu } from "lucide-react";
+import { LayoutDashboard, Table2, Boxes, Scale, ListTree, Factory, Users, Menu } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "../context/RoleContext";
 import { Button } from "./ui/button";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
-  { to: "/orders", label: "Conference Order", icon: Table2, id: "orders" },
-  { to: "/summary", label: "Conference Order Summary", icon: ListTree, id: "summary" },
+  { to: "/orders", label: "Conference Stock", icon: Table2, id: "orders" },
   { to: "/stock", label: "In House Stock", icon: Boxes, id: "stock" },
+  { to: "/summary", label: "Conference Order Summary", icon: ListTree, id: "summary" },
+  { to: "/company-order", label: "Company Order", icon: Factory, id: "company-order" },
   { to: "/balance", label: "Balance Stock", icon: Scale, id: "balance" },
   { to: "/parties", label: "Parties", icon: Users, id: "parties" },
 ];

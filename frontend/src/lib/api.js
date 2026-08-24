@@ -22,6 +22,8 @@ export const api = {
   lookups: () => http.get("/lookups").then((r) => r.data),
   balanceStock: () => http.get("/balance-stock").then((r) => r.data),
   orderSummary: () => http.get("/order-summary").then((r) => r.data),
+  companyOrder: (pendingOnly = false) =>
+    http.get("/company-order", { params: { pending_only: pendingOnly } }).then((r) => r.data),
   stats: () => http.get("/stats/dashboard").then((r) => r.data),
   seed: () => http.post("/seed").then((r) => r.data),
 };

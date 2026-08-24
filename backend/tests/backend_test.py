@@ -502,3 +502,111 @@ class TestDashboard:
                   "parties", "party_wise", "item_wise"]:
             assert k in d
         assert set(d["status_counts"].keys()) >= {"not_ready", "arrived", "ready"}
+
+
+# ---------- Iteration 5: Company Order + xlsx/pdf exports ----------
+import io as _io
+
+
+class TestCompanyOrder:
+    def test_shape_and_totals(self, s):
+        r = s.get(f"{API}/company-order?pending_only=false")
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["rows", "total_lines", "total_ordered", "total_stock", "total_to_order"]:
+            assert k in d
+        # totals reconcile
+        assert d["total_lines"] == len(d["rows"])
+        assert abs(d["total_ordered"] - sum(x["ordered_qty"] for x in d["rows"])) < 1e-6
+        assert abs(d["total_stock"] - sum(x["stock_qty"] for x in d["rows"])) < 1e-6
+        assert abs(d["total_to_order"] - sum(x["to_order"] for x in d["rows"])) < 1e-6
+        for row in d["rows"][:20]:
+            expected = max(0, row["ordered_qty"] - row["stock_qty"])
+            assert row["to_order"] == expected
+            for k in ["group", "item", "shade", "ordered_qty", "stock_qty", "to_order"]:
+                assert k in row
+
+    def test_pending_only_filters(self, s):
+        all_ = s.get(f"{API}/company-order?pending_only=false").json()
+        pending = s.get(f"{API}/company-order?pending_only=true").json()
+        assert len(pending["rows"]) <= len(all_["rows"])
+        for row in pending["rows"]:
+            assert row["to_order"] > 0
+
+    def test_stock_reduces_qty_to_order_then_restored(self, s):
+        """Seed a marker order row, verify to_order == qty. Add a stock row for
+        the same key and verify to_order drops by the stock quantity. Then remove
+        the stock row and verify to_order restores. Cleans up everything."""
+        marker_item = "QA_CO_ITEM_ABC"
+        # ensure clean slate for this key
+        # create order row
+        r = s.post(f"{API}/order-rows/bulk", json={"rows": [
+            {"party_name": "QA_CO_P", "group": "QA_CO_G", "item": marker_item,
+             "shade": "CS1", "qty": 10, "rate": 0, "bill_no": ""}
+        ]})
+        oid = r.json()["saved"][0]["id"]
+        sid = None
+        try:
+            d = s.get(f"{API}/company-order?pending_only=false").json()
+            line = [x for x in d["rows"] if x["item"].upper() == marker_item]
+            assert len(line) == 1
+            assert line[0]["ordered_qty"] == 10
+            assert line[0]["stock_qty"] == 0
+            assert line[0]["to_order"] == 10
+
+            # add stock for same group+item+shade -> to_order drops
+            r2 = s.post(f"{API}/stock-rows/bulk", json={"rows": [
+                {"group": "QA_CO_G", "item": marker_item, "shade": "CS1",
+                 "quantity": 4, "row_index": 990}
+            ]})
+            sid = r2.json()["saved"][0]["id"]
+
+            d2 = s.get(f"{API}/company-order?pending_only=false").json()
+            line2 = [x for x in d2["rows"] if x["item"].upper() == marker_item][0]
+            assert line2["stock_qty"] == 4
+            assert line2["to_order"] == 6
+
+            # remove stock -> to_order reverts to 10
+            s.delete(f"{API}/stock-rows/{sid}")
+            sid = None
+            d3 = s.get(f"{API}/company-order?pending_only=false").json()
+            line3 = [x for x in d3["rows"] if x["item"].upper() == marker_item][0]
+            assert line3["stock_qty"] == 0
+            assert line3["to_order"] == 10
+        finally:
+            if sid:
+                s.delete(f"{API}/stock-rows/{sid}")
+            s.delete(f"{API}/order-rows/{oid}")
+
+    def test_export_xlsx_is_valid_openpyxl(self, s):
+        for pending in ("true", "false"):
+            r = s.get(f"{API}/company-order/export.xlsx?pending_only={pending}")
+            assert r.status_code == 200
+            assert "spreadsheetml" in r.headers.get("content-type", "")
+            from openpyxl import load_workbook
+            wb = load_workbook(_io.BytesIO(r.content))
+            ws = wb.active
+            # Row 1 title, row 2 generated, row 3 blank, row 4 header
+            header = [ws.cell(row=4, column=c).value for c in range(1, 8)]
+            assert header == ["SR", "GROUP NAME", "ITEM NAME", "SHADE",
+                              "ORDERED QTY", "IN HOUSE STOCK", "QTY TO ORDER"]
+            # Last row must be TOTAL row and bold
+            last_row = ws.max_row
+            total_cell = ws.cell(row=last_row, column=4)
+            assert str(total_cell.value).strip().upper() == "TOTAL"
+            assert total_cell.font.bold is True
+            # Row count reconciles with API count
+            api_rows = s.get(f"{API}/company-order?pending_only={pending}").json()["rows"]
+            # header at row 4, data rows 5..4+n, total row 5+n
+            assert last_row == 4 + len(api_rows) + 1
+            # Total-to-order equals sum in workbook
+            api_to_order = sum(r["to_order"] for r in api_rows)
+            assert ws.cell(row=last_row, column=7).value == api_to_order
+
+    def test_export_pdf_is_valid(self, s):
+        for pending in ("true", "false"):
+            r = s.get(f"{API}/company-order/export.pdf?pending_only={pending}")
+            assert r.status_code == 200
+            assert r.headers.get("content-type", "").startswith("application/pdf")
+            assert r.content[:4] == b"%PDF"
+            assert len(r.content) > 500

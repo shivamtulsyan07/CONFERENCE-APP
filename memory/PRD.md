@@ -26,13 +26,15 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - Conference Order Summary page (/summary): item-wise totals (Group Name, Item Name, Shade, Quantity) from GET /api/order-summary, with filters and total.
 - Excel-style drag-to-fill: blue handle at each cell's bottom-right, hold and drag down/up to copy the value into the range (single undo step).
-- Sheet names: Conference Order (/orders), Conference Order Summary (/summary), In House Stock (/stock), Balance Stock (/balance).
+- Sidebar order: Dashboard, Conference Stock (/orders), In House Stock, Conference Order Summary, Company Order, Balance Stock, Parties.
 - Sheets always keep one trailing blank row; blank rows are never persisted and clearing a saved row deletes it.
 
 - Range selection with Cmd/Ctrl + C / X / V (click-drag or shift+arrows to select; COPY / CUT / PASTE toolbar buttons mirror it). Paste is a single undo step.
 
 - Right-click context menu on any cell (SheetContextMenu): Cut / Copy / Paste, Clear contents, Fill down in selection, Insert row above / below, Duplicate row, Clear row, Delete row, Hide column / Show all columns. Hidden columns are display-only (values are still saved via allColumns).
 - A row is only persisted when it has a party, item, shade, MTR, bill number, qty or rate — conference/page/group alone no longer creates an empty row.
+
+- Company Order page (/company-order): what to order from the company = ordered qty − in house stock per Group+Item+Shade, "shortage only / all items" toggle, filters, totals, and Excel (openpyxl) + PDF (reportlab) export via GET /api/company-order/export.xlsx|.pdf?pending_only=.
 
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.

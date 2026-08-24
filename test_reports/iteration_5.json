@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 5 verified the new Company Order module (GET /api/company-order + xlsx/pdf exports) end-to-end and re-verified the iteration-5 regression fixes (right-click context menu, hidden columns not wiped, blank-order ignores conference/page/group). Backend: extended /app/backend/tests/backend_test.py with TestCompanyOrder covering shape/totals/pending-only filter, stock-reduces-to_order live math, xlsx openpyxl-parseable with correct title/headers/TOTAL bold row and total figures, and pdf %PDF magic bytes. 28/28 pytest cases pass serially. Frontend Playwright validated on the live preview URL: (a) /company-order loads and the stat cards + footer totals match GET /api/company-order for both pending_only=true (684 lines / 889 to_order) and pending_only=false (685 lines); (b) SHOWING SHORTAGE ONLY toggle flips to SHOWING ALL ITEMS and line counts change to match the API; (c) column filter company-filter-item=ALVARO narrows footer to_order from 889 to 15 which equals the backend-computed sum of ALVARO rows; (d) EXPORT EXCEL and EXPORT PDF buttons call window.open with the exact endpoint URL including pending_only param; (e) seeded a temporary order row (qty=10) and then a temporary stock line (quantity=4) via the API: GET /company-order shows to_order 10 -> 6 after +stock, then reverts to 10 after removing the stock, then cleanup deletes both; (f) right-click context menu on In House Stock opens with cut/copy/paste/clear/fill-down/insert-above/insert-below/duplicate-row/clear-row/delete-row/hide-column, and CRITICAL regression check: hiding the Quantity column, editing shade to trigger autosave and unhiding leaves quantity=7 intact in the DB and in the UI (allColumns wiring works); (g) mobile 390x844 renders company-order stats + all 7 sidebar items in mobile-nav; grid scrolls horizontally (scrollWidth 929 > clientWidth 356). No new bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/stock-rows / StockRow model", "issue": "StockRow still carries a 'conference' field even though iteration 3+ removed it from the UI. Silently ignored on new writes but present on old docs. Cosmetic."},
+      {"endpoint": "POST /api/order-rows/auto-status", "issue": "Aggregates stock per (group,item,shade) but does not deduct per-order demand across rows sharing the same key. Same product decision as iteration 3/4."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: remove vestigial StockRow.conference field. Optional: dedupe navigation for mobile by using page.get_by_role or unique testid so strict-mode locators do not double-match (currently both aside and mobile-nav share the same data-testid values)."
+  ],
+  "critical_code_review_comments": [
+    "useSheet.step (undo/redo) still POSTs /replace which rewrites the whole collection on every undo/redo — unchanged from iteration 3/4. Consider diff-based.",
+    "CompanyOrder.jsx builds the export URL client-side via window.open — fine, but there is no error UI if the browser blocks the popup. Could use a hidden <a download> click as a fallback.",
+    "server.py StockRow.conference is still declared although the sheet dropped that column two iterations ago.",
+    "/replace endpoints delete_many({}) then insert_many — a crash between the two would empty the collection. Consider a session/transaction or a server-side snapshot.",
+    "useSheet.pad now always appends a trailing blank sentinel (nice fix vs iteration 4 RCA)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestCompanyOrder class covering /api/company-order, live stock math, export.xlsx openpyxl validation and export.pdf magic-byte validation)"
+  ],
+  "success_rate": {"backend": "100% (28/28 serial)", "frontend": "100% of executed flows (company-order stats+totals match API, pending toggle, column filter, exports open correct URLs, live stock math via API, hidden-column preservation on autosave, mobile 390px sidebar+grid scroll)"},
+  "test_credentials": "N/A - no auth in app",
+  "seed_data_creation": "Backend TestCompanyOrder seeds QA_CO_P/QA_CO_ITEM_ABC/QA_CO_G order rows and QA_CO_G stock rows and cleans them up in a try/finally. Playwright frontend test seeded PW_HIDE_G/PW_HIDE_ITEM stock row (SHXQ, qty=7) and PW_CO_P/PW_CO_ITEM_ZZ5 order row + PW_CO_G stock row (qty=4) via the API; all cleaned up at the end. Real 812-row user data preserved throughout.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 shipped: GET /api/company-order (params: pending_only bool) returns {rows, total_lines, total_ordered, total_stock, total_to_order}; each row {group,item,shade,ordered_qty,stock_qty,to_order,parties}. Exports: GET /api/company-order/export.xlsx (openpyxl, title row + TOTAL bold) and /api/company-order/export.pdf (reportlab, %PDF header) both accept pending_only param. UI testids: company-order-page, pending-only-btn, export-excel-btn (window.open), export-pdf-btn (window.open), refresh-company-btn, company-filter-<key>, company-cell-<i>-<key>, company-total-ordered/stock/to-order, stat-lines/stat-ordered/stat-to-order (outer div wraps label + number; use last token of inner_text to parse). SheetCell renders values inside a native <input> only when a data option list is present or when the column is numeric-numeric input — for plain text cells in In House Stock the DOM may not have an <input> child in query terms visible from a JS eval that scans innerText; a targeted `${cell} input` selector still works for edit but readback should use inner_text or input_value with a fallback. Real DB has 812+ order rows and ~10 stock rows — never type into 'the last row' assuming blank; useSheet.pad now always appends a trailing blank sentinel so it is safe, but still prefer API seeding + filter isolation for tests. Run backend tests with `pytest -n 0` (still needed because TestReplaceEndpoints wipes collections).",
+  "rca of the issue": "No new bugs. Two testing quirks worth noting: (1) window.open with attachment-disposition responses shows as popup URL 'about:blank' — capture the target URL by monkey-patching window.open in the page context and reading window.__opens (used in the iteration 5 script). (2) Sidebar duplicates nav-<id> testids between the desktop aside and the mobile-nav overlay; use scoped locators (aside vs data-testid=mobile-nav) or add distinct testids to avoid strict-mode locator errors when both are in the DOM."
+}

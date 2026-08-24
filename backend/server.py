@@ -2,6 +2,8 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from starlette.responses import StreamingResponse
+import io
 import os
 import logging
 from pathlib import Path
@@ -318,6 +320,153 @@ async def lookups():
         "shades": uniq([r.get("shade", "") for r in order_rows] + [r.get("shade", "") for r in stock_rows]),
         "bill_nos": uniq([r.get("bill_no", "") for r in order_rows]),
     }
+
+
+# ---------- Company order (what to order from the company) ----------
+def company_order_rows_sync(orders, stock):
+    stock_by_key = {}
+    for s in stock:
+        key = (str(s.get("group", "")).strip().upper(), str(s.get("item", "")).strip().upper(), str(s.get("shade", "")).strip())
+        stock_by_key[key] = stock_by_key.get(key, 0) + (s.get("quantity") or 0)
+
+    agg = {}
+    for o in orders:
+        item = str(o.get("item", "")).strip()
+        if not item:
+            continue
+        group = str(o.get("group", "")).strip()
+        shade = str(o.get("shade", "")).strip()
+        key = (group.upper(), item.upper(), shade)
+        e = agg.setdefault(key, {
+            "group": group, "item": item, "shade": shade,
+            "ordered_qty": 0, "stock_qty": stock_by_key.get(key, 0), "parties": set(),
+        })
+        e["ordered_qty"] += o.get("qty") or 0
+        party = str(o.get("party_name", "")).strip()
+        if party:
+            e["parties"].add(party)
+
+    out = []
+    for e in agg.values():
+        to_order = e["ordered_qty"] - e["stock_qty"]
+        out.append({
+            "group": e["group"], "item": e["item"], "shade": e["shade"],
+            "ordered_qty": e["ordered_qty"], "stock_qty": e["stock_qty"],
+            "to_order": to_order if to_order > 0 else 0,
+            "parties": len(e["parties"]),
+        })
+    out.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
+    return out
+
+
+async def get_company_order(pending_only: bool):
+    orders = await db.order_rows.find().to_list(20000)
+    stock = await db.stock_rows.find().to_list(20000)
+    rows = company_order_rows_sync(orders, stock)
+    if pending_only:
+        rows = [r for r in rows if r["to_order"] > 0]
+    return rows
+
+
+@api_router.get("/company-order")
+async def company_order(pending_only: bool = False):
+    rows = await get_company_order(pending_only)
+    return {
+        "rows": rows,
+        "total_lines": len(rows),
+        "total_ordered": sum(r["ordered_qty"] for r in rows),
+        "total_stock": sum(r["stock_qty"] for r in rows),
+        "total_to_order": sum(r["to_order"] for r in rows),
+    }
+
+
+@api_router.get("/company-order/export.xlsx")
+async def company_order_xlsx(pending_only: bool = True):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    rows = await get_company_order(pending_only)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Company Order"
+    ws.append(["COMPANY ORDER REQUIREMENT"])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([f"Generated {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M UTC')}"])
+    ws.append([])
+    headers = ["SR", "GROUP NAME", "ITEM NAME", "SHADE", "ORDERED QTY", "IN HOUSE STOCK", "QTY TO ORDER"]
+    ws.append(headers)
+    head_row = ws.max_row
+    for c in range(1, len(headers) + 1):
+        cell = ws.cell(row=head_row, column=c)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="0A2540")
+        cell.alignment = Alignment(horizontal="center")
+    for i, r in enumerate(rows, start=1):
+        ws.append([i, r["group"], r["item"], r["shade"], r["ordered_qty"], r["stock_qty"], r["to_order"]])
+    total_row = ws.max_row + 1
+    ws.cell(row=total_row, column=4, value="TOTAL").font = Font(bold=True)
+    for col, key in ((5, "ordered_qty"), (6, "stock_qty"), (7, "to_order")):
+        ws.cell(row=total_row, column=col, value=sum(r[key] for r in rows)).font = Font(bold=True)
+    for col, width in zip("ABCDEFG", (6, 22, 32, 12, 14, 16, 14)):
+        ws.column_dimensions[col].width = width
+    ws.freeze_panes = ws.cell(row=head_row + 1, column=1)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="company-order.xlsx"'},
+    )
+
+
+@api_router.get("/company-order/export.pdf")
+async def company_order_pdf(pending_only: bool = True):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    rows = await get_company_order(pending_only)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm,
+                            leftMargin=12 * mm, rightMargin=12 * mm, title="Company Order")
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph("<b>COMPANY ORDER REQUIREMENT</b>", styles["Title"]),
+        Paragraph(f"Generated {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M UTC')}", styles["Normal"]),
+        Spacer(1, 6 * mm),
+    ]
+    data = [["SR", "GROUP NAME", "ITEM NAME", "SHADE", "ORDERED", "IN HOUSE", "TO ORDER"]]
+    for i, r in enumerate(rows, start=1):
+        data.append([str(i), r["group"], r["item"], r["shade"],
+                     f'{r["ordered_qty"]:g}', f'{r["stock_qty"]:g}', f'{r["to_order"]:g}'])
+    data.append(["", "", "", "TOTAL",
+                 f'{sum(r["ordered_qty"] for r in rows):g}',
+                 f'{sum(r["stock_qty"] for r in rows):g}',
+                 f'{sum(r["to_order"] for r in rows):g}'])
+    table = Table(data, repeatRows=1, colWidths=[12 * mm, 38 * mm, 58 * mm, 20 * mm, 20 * mm, 22 * mm, 22 * mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A2540")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (4, 0), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F4F7FA")]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(table)
+    doc.build(story)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="company-order.pdf"'},
+    )
 
 
 # ---------- Conference order summary ----------
