@@ -1,0 +1,129 @@
+{
+  "theme": "light",
+  "typography": {
+    "headings": {
+      "font_family": "Work Sans, sans-serif",
+      "strategy": "Swiss Brutalist (Tech/Art) inspired - strong, clear, authoritative",
+      "weights": ["font-semibold", "font-black"],
+      "sizes": {
+        "h1": "text-3xl sm:text-4xl tracking-tight",
+        "h2": "text-2xl sm:text-3xl tracking-tight",
+        "h3": "text-xl sm:text-2xl tracking-tight",
+        "h4": "text-lg sm:text-xl font-medium"
+      }
+    },
+    "body": {
+      "font_family": "IBM Plex Sans, sans-serif",
+      "strategy": "Clean, highly legible for dense data",
+      "sizes": {
+        "default": "text-sm",
+        "large": "text-base",
+        "small": "text-xs text-muted-foreground"
+      }
+    }
+  },
+  "colors": {
+    "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST (Authority, Clarity, Truth)",
+    "palette": {
+      "background": "#FFFFFF",
+      "surface": "#F8F9FA",
+      "primary": "#0A2540",
+      "accent": "#0066FF",
+      "success": "#00B368",
+      "warning": "#FF9900",
+      "destructive": "#E53935",
+      "border": "#E2E8F0",
+      "text_primary": "#0F172A",
+      "text_secondary": "#64748B"
+    },
+    "rules": [
+      "No full-screen gradients. Focus on flat, solid high-contrast colors.",
+      "The 'Tinted Grey' Rule: Tint neutral greys with slight blue (#F8F9FA) for a clean tech feel.",
+      "Never use pure transparent backgrounds on sticky headers or overlays. Use solid or heavily blurred backgrounds.",
+      "Use Accent (#0066FF) strictly for CTAs and interactive triggers. Do NOT overuse."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": "Grid Borders (The Technical Look) - 1px subtle borders on grid items and cards to expose the skeleton.",
+    "radius": "Subtle roundness, max 8px border-radius (rounded-md to rounded-lg).",
+    "shadows": "Minimal. Use crisp edges via semi-transparent borders. Soft ambient shadow (shadow-sm) only on hover for interactive cards.",
+    "textures": "Flat and solid. No glassmorphism (glass on data-heavy apps feels clinical and creates visual refraction)."
+  },
+  "grids_and_layouts": {
+    "strategy": "High Density Grid (For Dashboards / Analytics)",
+    "rules": [
+      "Base Grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4 for main stats.",
+      "Gap Strategy: Tight (gap-4 or gap-6).",
+      "Widgets: Primary data charts take col-span-2 or col-span-3. Summaries take col-span-1.",
+      "Spacing: Generous internal padding (p-4 to p-6) inside bordered containers to prevent text collision."
+    ]
+  },
+  "components": {
+    "general": [
+      "Use Shadcn/UI heavily for logical flow (tables, forms, select, dialogs, tabs).",
+      "DO NOT use generic HTML inputs (e.g., <select> or <input type='date'>). Use Shadcn counterparts.",
+      "Override Shadcn defaults where necessary to match the 8px radius and Swiss color scheme."
+    ],
+    "specific": {
+      "cards": "Go cardless where possible, or use flat rectangular styles with 1px border. No drop-shadows by default.",
+      "tables": "Dense rows. Left-align text, right-align numbers. Sticky headers for long inventory lists.",
+      "buttons": "Sharp or slightly rounded (rounded-md). High contrast on hover (e.g., hover:bg-primary/90)."
+    }
+  },
+  "motion": {
+    "strategy": "Minimalist micro-interactions for feedback.",
+    "rules": [
+      "Hover states on all interactive elements (buttons, table rows, links).",
+      "Use specific transitions (e.g., transition-colors duration-200), NEVER 'transition-all'.",
+      "Focus states must have HIGHER contrast (e.g., focus:ring-2 focus:ring-accent)."
+    ]
+  },
+  "accessibility": {
+    "contrast": "Minimum 4.5:1 for text below 18px. Minimum 3:1 for large text and interactive elements.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case."
+  },
+  "media": {
+    "rules": [
+      "Keep imagery extremely minimal as this is an internal ops dashboard.",
+      "If empty states or illustrative blocks are needed, use the provided conceptual URLs."
+    ],
+    "image_urls": [
+      {
+        "category": "empty_state_inventory",
+        "url": "https://images.unsplash.com/photo-1587293852726-70cdb56c2866?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxpbnZlbnRvcnklMjB3YXJlaG91c2UlMjBtaW5pbWFsfGVufDB8fHx8MTc4NzU2Njc5N3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Minimal warehouse shelves, useful for empty state of 'No Stock Found'"
+      },
+      {
+        "category": "dispatch_illustration",
+        "url": "https://images.pexels.com/photos/6169055/pexels-photo-6169055.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Dispatch boxes on a dolly, useful for 'Dispatch Party' section empty state or header"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build a robust Dashboard/Internal Ops app covering: Sales/Dispatch Stats, Customer Management, Inventory, Order Entry, PO to Company, Party-wise Dispatch.",
+    "Implement Role Switch (Staff/Admin) via a simple UI toggle in the header (no actual auth required for now).",
+    "Use light theme by default as it is an operational data entry tool.",
+    "Focus on data density and clear information architecture.",
+    "Use Phosphor Icons or Lucide-react for sharp, recognizable iconography.",
+    "All logic should be mocked cleanly in .js files until backend integration is specified.",
+    "Use Shadcn UI components extensively to maintain consistent, accessible interactive elements.",
+    "Use JavaScript (.js/.jsx) instead of TypeScript (.tsx)."
+  ],
+  "universal_guidelines_for_main_agent": [
+    "You tend to converge toward generic, 'on distribution' outputs. Make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts. Use optical alignment.",
+    "Create depth through layered design elements with z-index hierarchy, though for dashboards prefer flat structural layering over deep shadows.",
+    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; }.",
+    "Always use modern button styles (max 8px radius for this app) with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, focus states, and entrance animations.",
+    "Use generous spacing inside components (p-4 to p-6 for cards).",
+    "Subtle grain textures or custom selection states separate good from extraordinary.",
+    "Missing categories = placeholder text which is FORBIDDEN. Use the provided URLs.",
+    "Prioritize using pre-existing components from src/components/ui. Create new components that match the style when needed.",
+    "Use sonner for toasts (located in /app/src/components/ui/sonner.js)."
+  ]
+}

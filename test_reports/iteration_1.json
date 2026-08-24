@@ -1,0 +1,68 @@
+{
+  "summary": "Tested Conference Ops (Orders/PO/Receive/Dispatch/Inventory/Parties). Fixed a critical MongoDB _id serialization bug in backend that broke every list on the frontend (React keys, all id-based buttons). After fix, 7/7 pytest backend tests pass (seed idempotency, dashboard stats, parties CRUD, products CRUD+stock adjust, full end-to-end order->PO->partial+full receive->stock inc->partial+full dispatch->stock dec, insufficient stock validation, over-receive validation, over-dispatch validation). Frontend end-to-end verified with Playwright: seed, add party, +/- stock, multi-line order create with running total, admin/staff role toggle hides/shows delete actions, mobile nav opens at 390px width.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "ALL list/create endpoints (parties, products, orders, company-orders, dispatches)",
+        "issue": "Pydantic BaseDocument declared `id` with alias='_id'; FastAPI serialized responses with `_id` key instead of `id`. Frontend uses obj.id everywhere (row keys, data-testid, dispatch/receive lookups, Select values). Consequence pre-fix: React keys undefined, every delete/receive/dispatch/stock button had data-testid ending with 'undefined', dropdowns had duplicate empty values, and dispatch stockOf() returned 0 for everything. Fixed by removing the `_id` alias and mapping _id->id string inside from_mongo(). File: /app/backend/server.py (BaseDocument).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/orders",
+        "issue": "party_id validation uses oid() which raises HTTP 400 on invalid ObjectId; acceptable, but 404 wording says 'Party not found' after passing oid() — consistent."
+      },
+      {
+        "endpoint": "GET /api/stats/dashboard",
+        "issue": "pending_dispatch counts every order not in 'dispatched' status (includes pending/ordered_to_company/received/partial). Matches spec but callers should be aware."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "All list rendering (root cause: backend _id vs id)",
+        "issue": "Pre-fix, none of the row-level buttons worked because their data-testid suffixes were 'undefined' and Select values collided. Resolved by backend fix above.",
+        "affected_selectors": ["party-row-<id>", "product-row-<id>", "order-row-<id>", "po-row-<id>", "dispatch-row-<id>", "stock-plus-<id>", "stock-minus-<id>", "receive-btn-<id>", "dispatch-btn-<id>", "delete-*"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Dashboard",
+        "issues": ["Recharts logs 'width(-1)/height(-1)' warnings when the chart container is initially 0-sized (before data). Cosmetic; charts render after data loads."]
+      },
+      {
+        "screen": "All Dialogs",
+        "issues": ["Radix warns 'Missing Description or aria-describedby' on every DialogContent. Add DialogDescription for a11y."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Keep the BaseDocument fix (mapping _id -> id string in from_mongo) — do NOT reintroduce alias='_id' or the whole frontend will break again.",
+    "Add DialogDescription to every DialogContent to remove the Radix a11y warning.",
+    "Optional: pending_dispatch on dashboard could be renamed/scoped to 'orders not yet fully dispatched' or filtered further for clarity."
+  ],
+  "critical_code_review_comments": [
+    "next_no(prefix, collection, ...) uses count_documents({}) which is NOT unique-safe under concurrent creates or after deletes — two simultaneous POSTs can yield the same order_no. Use a counters collection with findOneAndUpdate($inc), or a UUID.",
+    "receive_company_order mutates po.items in place and only writes to Mongo at the end. If receive of one item passes but a later item exceeds pending, the earlier item's shop_stock $inc has already been applied while the PO document is never updated — resulting in stock drift. Wrap in a session/transaction, or validate ALL items first, then apply.",
+    "create_dispatch has the same issue: it validates all items, then deducts stock and updates the order in separate awaits without a transaction. A crash between the two loops causes stock/order drift.",
+    "Party existence is validated with oid() but a bad 24-hex string that happens to be valid ObjectId still passes; only later checked in orders. Consider validating on parties/products endpoints too.",
+    "Order status vocabulary: backend uses 'partial' for both PO partial-received and Order partly-dispatched; frontend STATUS_LABEL maps 'partial' -> 'Partly Dispatched' which is misleading on the PO table (shows 'Partly Dispatched' for partial-received). Consider distinct enums (e.g. 'po_partial' vs 'order_partial')."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (BaseDocument id field: removed alias='_id'; from_mongo now maps _id->id string; to_mongo drops 'id')",
+    "/app/backend/tests/backend_test.py (new pytest suite, 7 tests, JUnit XML)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% of executed flows"},
+  "seed_data_creation": "Backend /api/seed used (3 parties + 4 products). Test suite also creates TEST_ prefixed products/orders that are cleaned up. Playwright added one 'UI_Test_Party' to Parties table.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression tests live in /app/backend/tests/backend_test.py and cover the complete workflow. If BaseDocument is touched again, the very first thing to verify is that GET /api/parties returns a JSON `id` field (not `_id`).",
+  "rca of the issue": "Root cause: BaseDocument's `id: Optional[PyObjectId] = Field(default=None, alias='_id')` combined with FastAPI/Pydantic v2 behavior caused response JSON to emit '_id' (the alias) rather than 'id'. The React frontend accesses obj.id in ~30 places (Select values, table row keys, data-testid template literals, delete/receive/dispatch handlers). Every one was silently getting `undefined`. Reproduction: curl GET /api/parties -> keys had `_id`. Mitigation: removed the alias, map _id -> id string in from_mongo(). Verified via pytest + Playwright."
+}
