@@ -205,21 +205,33 @@ async def list_order_rows():
 
 @api_router.post("/order-rows/bulk")
 async def save_order_rows(payload: BulkOrderRows):
+    from pymongo import UpdateOne
+
     saved = []
+    ops, inserts = [], []
+    delete_ids = []
     for i, r in enumerate(payload.rows):
         if is_blank_order(r):
             if r.id:
-                await db.order_rows.delete_one({"_id": oid(r.id)})
+                delete_ids.append(oid(r.id))
             continue
         data = r.model_dump(exclude={"id"})
         data["amount"] = (r.qty or 0) * (r.rate or 0)
         if r.id:
-            await db.order_rows.update_one({"_id": oid(r.id)}, {"$set": data})
+            ops.append(UpdateOne({"_id": oid(r.id)}, {"$set": data}))
             saved.append({"index": i, "id": r.id})
         else:
             data["created_at"] = now_iso()
-            res = await db.order_rows.insert_one(data)
-            saved.append({"index": i, "id": str(res.inserted_id)})
+            inserts.append((i, data))
+    if delete_ids:
+        await db.order_rows.delete_many({"_id": {"$in": delete_ids}})
+    if ops:
+        await db.order_rows.bulk_write(ops, ordered=False)
+    if inserts:
+        res = await db.order_rows.insert_many([d for _, d in inserts])
+        for (i, _), new_id in zip(inserts, res.inserted_ids):
+            saved.append({"index": i, "id": str(new_id)})
+    saved.sort(key=lambda s: s["index"])
     return {"saved": saved}
 
 
@@ -290,20 +302,30 @@ async def list_stock_rows():
 @api_router.post("/stock-rows/bulk", response_model=None)
 @api_router.post("/stock-rows/bulk")
 async def save_stock_rows(payload: BulkStockRows):
-    saved = []
+    from pymongo import UpdateOne
+
+    saved, ops, inserts, delete_ids = [], [], [], []
     for i, r in enumerate(payload.rows):
         if is_blank_stock(r):
             if r.id:
-                await db.stock_rows.delete_one({"_id": oid(r.id)})
+                delete_ids.append(oid(r.id))
             continue
         data = r.model_dump(exclude={"id"})
         if r.id:
-            await db.stock_rows.update_one({"_id": oid(r.id)}, {"$set": data})
+            ops.append(UpdateOne({"_id": oid(r.id)}, {"$set": data}))
             saved.append({"index": i, "id": r.id})
         else:
             data["created_at"] = now_iso()
-            res = await db.stock_rows.insert_one(data)
-            saved.append({"index": i, "id": str(res.inserted_id)})
+            inserts.append((i, data))
+    if delete_ids:
+        await db.stock_rows.delete_many({"_id": {"$in": delete_ids}})
+    if ops:
+        await db.stock_rows.bulk_write(ops, ordered=False)
+    if inserts:
+        res = await db.stock_rows.insert_many([d for _, d in inserts])
+        for (i, _), new_id in zip(inserts, res.inserted_ids):
+            saved.append({"index": i, "id": str(new_id)})
+    saved.sort(key=lambda s: s["index"])
     return {"saved": saved}
 
 
@@ -375,21 +397,31 @@ async def list_line_rows(sheet: str):
 
 @api_router.post("/line-sheet/{sheet}/bulk")
 async def save_line_rows(sheet: str, payload: BulkLineRows):
+    from pymongo import UpdateOne
+
     coll = line_collection(sheet)
-    saved = []
+    saved, ops, inserts, delete_ids = [], [], [], []
     for i, r in enumerate(payload.rows):
         if is_blank_line(r):
             if r.id:
-                await coll.delete_one({"_id": oid(r.id)})
+                delete_ids.append(oid(r.id))
             continue
         data = r.model_dump(exclude={"id"})
         if r.id:
-            await coll.update_one({"_id": oid(r.id)}, {"$set": data})
+            ops.append(UpdateOne({"_id": oid(r.id)}, {"$set": data}))
             saved.append({"index": i, "id": r.id})
         else:
             data["created_at"] = now_iso()
-            res = await coll.insert_one(data)
-            saved.append({"index": i, "id": str(res.inserted_id)})
+            inserts.append((i, data))
+    if delete_ids:
+        await coll.delete_many({"_id": {"$in": delete_ids}})
+    if ops:
+        await coll.bulk_write(ops, ordered=False)
+    if inserts:
+        res = await coll.insert_many([d for _, d in inserts])
+        for (i, _), new_id in zip(inserts, res.inserted_ids):
+            saved.append({"index": i, "id": str(new_id)})
+    saved.sort(key=lambda s: s["index"])
     return {"saved": saved}
 
 
@@ -1042,6 +1074,15 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def ensure_indexes():
+    await db.order_rows.create_index([("row_index", 1)])
+    await db.stock_rows.create_index([("row_index", 1)])
+    await db.company_sent_rows.create_index([("row_index", 1)])
+    await db.company_arrived_rows.create_index([("row_index", 1)])
+    await db.assistant_messages.create_index([("session_id", 1), ("created_at", 1)])
 
 
 @app.on_event("shutdown")

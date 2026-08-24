@@ -1,0 +1,70 @@
+{
+  "summary": "Verified windowing perf fix on /orders (3696 rows), /company-balance (685 rows), /stock, /stock-arrived and re-ran full backend pytest suite. Windowing works as designed. One regression found: React 'Maximum update depth exceeded' overlay when pressing ArrowDown ~120 times across the window boundary (dev overlay hijacks the page until reload). All other regression flows (autosave, footer counts, scroll to bottom, large paste) pass.",
+  "perf_measurements": {
+    "/orders (3696 rows)": {
+      "load_ms_until_first_row": 1246,
+      "dom_inputs_after_load": 560,
+      "dom_order_rows_after_load": 56,
+      "keystroke_latency_ms": {"median": 102, "max": 124, "samples": [124.1,114.4,99.3,102.3,101.8,97.9,102.8,111.8,100.0]},
+      "footer_text": "Σ  3696 rows shown  1979  Value  0",
+      "scroll_to_bottom_last_rows": ["order-row-3694", "order-row-3695", "order-row-3696"],
+      "grid_scrollHeight_px": 122102,
+      "expected_scrollHeight_px": "3696 * 33 = 121968 (+ padding OK)"
+    },
+    "/company-balance (685 rows)": {
+      "load_ms": 499,
+      "dom_inputs_after_load": 336,
+      "scroll_to_bottom_last_rows": ["cb-row-683","cb-row-684","cb-row-685"],
+      "footer": "Σ 685 rows shown 976"
+    },
+    "/stock (14 rows in DB)": {"load_ms": 339, "dom_inputs": 60},
+    "/stock-arrived (0 rows)": {"load_ms": 373, "dom_inputs": 90},
+    "autosave_flow": "typed QAPERF_<ts> into row 3696 -> ALL SAVED indicator shown after 900ms debounce, GET /api/order-rows returns the row, cleanup via blank+id bulk POST returned 200",
+    "keyboard_nav_across_window": "90 ArrowDown from row 0 correctly focused cell-90-party_name and auto-scrolled the grid (scrollTop went to 2464). At 120 presses the React max-update-depth overlay appears (see frontend_issues)."
+  },
+  "backend_pytest": {
+    "command": "pytest /app/backend/tests/backend_test.py --junitxml=/app/test_reports/pytest/iter11_backend.xml (default pytest.ini uses xdist -n=auto)",
+    "result": "24 passed, 4 failed",
+    "failures_analysed": [
+      {"test": "TestStockRows::test_stock_bulk_blank_skipped", "cause": "xdist race - another parallel test (test_same_item_shade_different_group_are_separate_lines) created QA_BAL_G1 stock row between this test's before/after count. Passes when run single-threaded."},
+      {"test": "TestAutoStatus::test_auto_status_matches_on_group_item_shade", "cause": "xdist race with concurrent balance-stock tests altering QA_AUTO_ITEM stock. Passes single-threaded."},
+      {"test": "TestCompanyOrder::test_export_xlsx_is_valid_openpyxl", "cause": "xdist race; passes single-threaded."},
+      {"test": "TestCompanyOrder::test_shape_and_totals", "cause": "STALE TEST (not a bug). Server now computes to_order = ordered_qty - stock_qty - pending_with_company (see server.py L525). The test still expects to_order == max(0, ordered_qty - stock_qty). Test needs updating, not the code."}
+    ]
+  },
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/company-order", "issue": "backend_test.py::TestCompanyOrder::test_shape_and_totals is stale - it does not account for the pending_with_company subtraction added in the Company Balance flow. Please update the assertion or the test docstring."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OrderSheet + useSheet/useWindowRows", "issue": "Holding ArrowDown across the window boundary (~90+ presses in a burst, e.g. auto-repeat or keyboard macros) triggers React 'Maximum update depth exceeded'. In dev the webpack-dev-server-client-overlay iframe covers the page and intercepts all clicks until reload; in prod it will spam the console. RCA: focusCell for an off-window row calls setEnsureVisible->scrollToRow which mutates scrollTop imperatively; the ensuing 'scroll' event calls recompute->setRange while setAnchor also calls setSel on every keydown - too many chained state updates within one microtask for React's safety limit. Suggested fix: (a) rAF-throttle recompute in useWindowRows so bursts collapse to one setRange per frame, and/or (b) short-circuit scrollToRow when the row is already within the current [start,end], and/or (c) skip setSel in onKeyDown when the anchor didn't actually move.", "selector": "input[data-testid^=\"cell-\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/orders", "issues": ["Per-keystroke latency is ~100 ms on 3696 rows (median 102, max 124). Fine for typing prose, but sluggish for numeric entry. SheetCell has no React.memo, so every keystroke re-renders all ~560 windowed cells. Consider wrapping SheetCell in React.memo with a shallow prop equality (row-value + row-index) - a cheap 3-5x speed-up."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter11_backend.xml"
+  ],
+  "action_items": [
+    "Fix Max-update-depth: rAF-throttle useWindowRows.recompute AND skip scrollToRow / setSel when nothing actually changed (this is user-visible in dev).",
+    "Add React.memo to SheetCell to bring per-keystroke latency below ~30 ms on 3696-row grids.",
+    "Update backend_test.py TestCompanyOrder::test_shape_and_totals so it accounts for pending_with_company subtraction (stale test)."
+  ],
+  "critical_code_review_comments": [
+    "useWindowRows.recompute writes state on every scroll event without throttling - the scroll listener runs at 60-120Hz during momentum scroll on high-refresh trackpads. Wrap with a requestAnimationFrame guard (single scheduled recompute per frame).",
+    "useSheet.focusCell calls ensureRef unconditionally when the element is not in the inputs map; it should first check whether the requested row is inside [win.start, win.end] and only scroll if not - otherwise fresh mounts (during a re-render race) trigger a needless scroll+recompute.",
+    "useSheet.onKeyDown calls setAnchor on every ArrowUp/Down/Tab/Enter even when the anchor did not move; combined with 3696 rows this contributes to the burst-key crash.",
+    "OrderSheet.jsx line 42-43: blankZeros() replaces `qty: 0/rate: 0` with empty strings when loading, but the normalize() at line 46-52 casts them back to Number(0). The round-trip is fine, but it makes `isBlank` (in useSheet) less robust because empty string vs 0 vs `''` are all treated as blank via .trim() comparison - please add a unit test for this.",
+    "Backend server.py list_order_rows uses .to_list(5000) - the DB already has 3696 rows; you are 1.5x away from silently truncating. Either raise the cap or paginate."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "96% (24/25 real tests, 1 stale)", "frontend_perf": "100% (windowing goal met on all 4 grids)", "frontend_regression": "95% (Max-update-depth burst issue)"},
+  "seed_data_creation": "None. Existing 3696 order rows + 685 CB rows preserved. All QA_/QAPERF_/QAPST_ test rows cleaned up via blank+id bulk delete.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Windowing testids: order-grid, cb-grid, stock-grid, sa-grid. Row-count assertions: document.querySelectorAll('[data-testid=\"order-grid\"] input').length should stay <~600 at all scroll positions. To reproduce the Max-update-depth: goto /orders, wait for grid, click any cell in row 0, then send 120 ArrowDown presses with no delay - dev overlay appears. Prod deploy will just spam console.",
+  "rca of the issue": "Windowing itself is correct (only rows within [start,end] are rendered, pad rows keep scrollHeight = total*33). Max-update-depth chain: onKeyDown(ArrowDown) -> setAnchor->setSel(setState) + focusCell -> off-window -> ensureRef=scrollToRow -> el.scrollTop=... -> synchronous 'scroll' event -> onScroll -> recompute -> setRange(setState) -> re-render -> new scrollToRow identity -> useEffect fires setEnsureVisible (ref, no state) -> next ArrowDown in queue repeats the loop. With 90-120 rapid keydowns Playwright dispatches faster than React can flush, exceeding the default nested-update depth. Fix: rAF-throttle recompute AND early-return scrollToRow when row is already visible."
+}

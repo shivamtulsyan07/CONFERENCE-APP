@@ -1,4 +1,6 @@
-export const SheetCell = ({
+import { memo } from "react";
+
+export const SheetCell = memo(({
   value,
   colIndex,
   rowIndex,
@@ -28,7 +30,11 @@ export const SheetCell = ({
       }}
     >
       <input
-        ref={(el) => { if (el) inputs.current[`${rowIndex}-${colIndex}`] = el; }}
+        ref={(el) => {
+          const k = `${rowIndex}-${colIndex}`;
+          if (el) inputs.current[k] = el;
+          else delete inputs.current[k];
+        }}
         data-testid={testId}
         list={listId}
         value={value ?? ""}
@@ -53,7 +59,14 @@ export const SheetCell = ({
       )}
     </td>
   );
-};
+}, (a, b) =>
+  a.value === b.value &&
+  a.rowIndex === b.rowIndex &&
+  a.colIndex === b.colIndex &&
+  a.column === b.column &&
+  a.sheet.isInFill(a.rowIndex, a.colIndex) === b.sheet.isInFill(b.rowIndex, b.colIndex) &&
+  a.sheet.isSelected(a.rowIndex, a.colIndex) === b.sheet.isSelected(b.rowIndex, b.colIndex)
+);
 
 export const Datalists = ({ columns }) =>
   columns

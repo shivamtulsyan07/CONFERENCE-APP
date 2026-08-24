@@ -3,6 +3,7 @@ import { api, errMsg, money, STATUS_META } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { useWindowRows } from "../lib/useWindowRows";
 import { SheetFrame } from "../components/SheetFrame";
 import { SheetContextMenu } from "../components/SheetContextMenu";
 import { FilterPopover } from "../components/FilterPopover";
@@ -55,6 +56,8 @@ export default function OrderSheet() {
 
   const sheetBase = useSheet({ columns, allColumns, load, save: saveRows, replace: replaceRows, remove: api.deleteOrderRow, blankRow, minRows: 15 });
   const sheet = { ...sheetBase, onContextMenu: setMenu };
+  const win = useWindowRows(sheetBase.filtered.length);
+  useEffect(() => { sheetBase.setEnsureVisible(win.scrollToRow); }, [win.scrollToRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onCell = (idx, col, value) => {
     if (col.key === "party_name") {
@@ -128,7 +131,7 @@ export default function OrderSheet() {
       subtitle="Tab/Enter to move · click-drag a range then Cmd/Ctrl + C/X/V · drag the blue corner to fill down · click the SR number to change row colour"
       actions={actions}
     >
-      <div className="sheet-scroll" data-testid="order-grid">
+      <div className="sheet-scroll" data-testid="order-grid" ref={win.scrollRef} onScroll={win.onScroll}>
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3F6F52] text-white">
@@ -159,8 +162,11 @@ export default function OrderSheet() {
             )}
           </thead>
           <tbody>
-            {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} className="text-[#0A2540]" style={{ background: STATUS_META[row.status || "not_ready"].color }}
+            {win.padTop > 0 && (
+              <tr aria-hidden style={{ height: win.padTop }}><td colSpan={columns.length + 2} /></tr>
+            )}
+            {sheet.filtered.slice(win.start, win.end).map(({ row, idx }) => (
+              <tr key={row.id || row._local || idx} className="text-[#0A2540]" style={{ background: STATUS_META[row.status || "not_ready"].color, height: win.rowHeight }}
                 data-testid={`order-row-${idx}`}>
                 <td className="border-r border-b border-[color:var(--sheet-border)] text-center p-0">
                   <button
@@ -195,6 +201,9 @@ export default function OrderSheet() {
                 </td>
               </tr>
             ))}
+            {win.padBottom > 0 && (
+              <tr aria-hidden style={{ height: win.padBottom }}><td colSpan={columns.length + 2} /></tr>
+            )}
           </tbody>
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">

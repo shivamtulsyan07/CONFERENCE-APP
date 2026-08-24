@@ -5,6 +5,7 @@ import { SheetCell, Datalists } from "./SheetCell";
 import { SheetToolbar } from "./SheetToolbar";
 import { SheetContextMenu } from "./SheetContextMenu";
 import { FilterPopover } from "./FilterPopover";
+import { useWindowRows } from "../lib/useWindowRows";
 import { SheetFrame, StatStrip } from "./SheetFrame";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -71,6 +72,8 @@ export const LineSheet = ({
     blankRow, minRows: 15,
   });
   const sheet = { ...sheetBase, onContextMenu: setMenu };
+  const win = useWindowRows(sheetBase.filtered.length);
+  useEffect(() => { sheetBase.setEnsureVisible(win.scrollToRow); }, [win.scrollToRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
@@ -102,7 +105,7 @@ export const LineSheet = ({
         </>
       }
     >
-      <div className="sheet-scroll" data-testid={`${prefix}grid`}>
+      <div className="sheet-scroll" data-testid={`${prefix}grid`} ref={win.scrollRef} onScroll={win.onScroll}>
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="text-white" style={{ background: headerColor }}>
@@ -143,8 +146,11 @@ export const LineSheet = ({
             )}
           </thead>
           <tbody>
-            {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" data-testid={`${prefix}row-${idx}`}>
+            {win.padTop > 0 && (
+              <tr aria-hidden style={{ height: win.padTop }}><td colSpan={columns.length + extraColumns.length + 2} /></tr>
+            )}
+            {sheet.filtered.slice(win.start, win.end).map(({ row, idx }) => (
+              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" style={{ height: win.rowHeight }} data-testid={`${prefix}row-${idx}`}>
                 <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {idx + 1}
                 </td>
@@ -185,6 +191,9 @@ export const LineSheet = ({
                 </td>
               </tr>
             ))}
+            {win.padBottom > 0 && (
+              <tr aria-hidden style={{ height: win.padBottom }}><td colSpan={columns.length + extraColumns.length + 2} /></tr>
+            )}
           </tbody>
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">

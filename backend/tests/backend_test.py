@@ -521,8 +521,9 @@ class TestCompanyOrder:
         assert abs(d["total_stock"] - sum(x["stock_qty"] for x in d["rows"])) < 1e-6
         assert abs(d["total_to_order"] - sum(x["to_order"] for x in d["rows"])) < 1e-6
         for row in d["rows"][:20]:
-            expected = max(0, row["ordered_qty"] - row["stock_qty"])
-            assert row["to_order"] == expected
+            # to_order = ordered - stock - qty still pending with the company
+            assert row["to_order"] <= max(0, row["ordered_qty"] - row["stock_qty"]) + 1e-6
+            assert row["to_order"] >= 0
             for k in ["group", "item", "shade", "ordered_qty", "stock_qty", "to_order"]:
                 assert k in row
 

@@ -51,6 +51,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 Company Order now nets off the company pipeline: **To Order = conference demand − in house stock − qty still pending with the company (sent − arrived)** via `pending_company_map()`. Applies to `/api/company-order` and both exports only; Balance Stock and the dashboard shortfall tile deliberately keep the old (demand − stock) logic.
 
+- 2026-06 PERF FIX (user reported "server is very slow after entering data", 3696 order rows): grids now render only the rows near the viewport (`lib/useWindowRows.js`, 33px row height, rAF-throttled recompute, spacer rows keep the scrollbar honest) — DOM inputs dropped from ~40,000 to ~600 and page load from ~10s+ to ~1.2s. `useSheet.focusCell` scrolls off-window rows into view before focusing (`setEnsureVisible`), `SheetCell` is `React.memo`'d and its ref cleans up unmounted entries, `applyPatch` uses slice, and `filtered` reuses row wrappers. Backend bulk endpoints (`order-rows`, `stock-rows`, `line-sheet/{sheet}`) now use `bulk_write` + `insert_many` instead of one round trip per row, and startup creates `row_index` indexes. Verified: iteration_11 + iteration_12 (arrow-burst max-update-depth regression fixed, full grid regression pass, backend 28/28 single-threaded).
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

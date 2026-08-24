@@ -100,7 +100,8 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
 
   const applyPatch = (idx, patch) => {
     pushHistory();
-    const next = rowsRef.current.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+    const next = rowsRef.current.slice();
+    next[idx] = { ...next[idx], ...patch };
     if (idx >= next.length - 1) next.push(newRow(next.length));
     commit(next);
     dirty.current.add(idx);
@@ -110,17 +111,36 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
   const setCell = (idx, key, value) => applyPatch(idx, { [key]: value });
   const setRow = (idx, patch) => applyPatch(idx, patch);
 
+  const wrapCache = useRef(new Map());
+
   const filtered = useMemo(() => {
+    // reuse the {row, idx} wrapper of unchanged rows so a keystroke allocates one object, not N
+    const cache = wrapCache.current;
+    const next = new Map();
+    const all = rows.map((r, i) => {
+      const hit = cache.get(r);
+      const w = hit && hit.idx === i ? hit : { row: r, idx: i };
+      next.set(r, w);
+      return w;
+    });
+    wrapCache.current = next;
     const colsByKey = Object.fromEntries(columns.map((c) => [c.key, c]));
-    const all = rows.map((r, i) => ({ row: r, idx: i }));
     const anyFilter = Object.values(filters || {}).some((f) => f && typeof f === "object");
     if (!anyFilter && !search.trim()) return all;
     return all.filter(({ row }) => isBlank(row) || matchRow(row, filters, colsByKey, search));
   }, [rows, filters, columns, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const ensureRef = useRef(null);
+
   const focusCell = (r, c) => {
     const el = inputs.current[`${r}-${c}`];
-    if (el) { el.focus(); el.select?.(); }
+    if (el) { el.focus(); el.select?.(); return; }
+    // row may be outside the rendered window: scroll it in, then focus
+    ensureRef.current?.(r);
+    requestAnimationFrame(() => {
+      const el2 = inputs.current[`${r}-${c}`];
+      if (el2) { el2.focus(); el2.select?.(); }
+    });
   };
 
   const onKeyDown = (e, r, c) => {
@@ -221,7 +241,10 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
 
   const setAnchor = (r, c) => {
     const s = { r1: r, c1: c, r2: r, c2: c };
+    const p = selRef.current;
     selRef.current = s;
+    // a single-cell anchor that didn't move needs no re-render
+    if (p && p.r1 === r && p.c1 === c && p.r2 === r && p.c2 === c) return;
     setSel(s);
   };
 
@@ -435,14 +458,20 @@ export function useSheet({ columns, allColumns, load, save, replace, remove, bla
     }
   };
 
+  const dataCount = useMemo(
+    () => filtered.reduce((n, { row }) => (isBlank(row) ? n : n + 1), 0),
+    [filtered] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   return {
     rows, filtered, filters, setFilters, setCell, setRow, onKeyDown, onPaste,
-    dataCount: filtered.filter(({ row }) => !isBlank(row)).length,
+    dataCount,
     search, setSearch,
     setFilter: (key, f) => setFilters((prev) => ({ ...prev, [key]: f })),
     clearFilters: () => { setFilters({}); setSearch(""); },
     filterCount: activeCount(filters) + (search.trim() ? 1 : 0),
     status, flush, deleteRow, refresh, inputs,
+    setEnsureVisible: (fn) => { ensureRef.current = fn; },
     undo, redo, canUndo: histSize.past > 0, canRedo: histSize.future > 0,
     fillStart, fillOver, isInFill,
     selectStart, selectOver, isSelected, hasSelection: !!(sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2)),

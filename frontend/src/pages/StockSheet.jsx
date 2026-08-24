@@ -3,6 +3,7 @@ import { api, errMsg } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { useWindowRows } from "../lib/useWindowRows";
 import { SheetFrame } from "../components/SheetFrame";
 import { SheetContextMenu } from "../components/SheetContextMenu";
 import { FilterPopover } from "../components/FilterPopover";
@@ -45,6 +46,8 @@ export default function StockSheet() {
 
   const sheetBase = useSheet({ columns, allColumns, load, save: saveRows, replace: replaceRows, remove: api.deleteStockRow, blankRow, minRows: 15 });
   const sheet = { ...sheetBase, onContextMenu: setMenu };
+  const win = useWindowRows(sheetBase.filtered.length);
+  useEffect(() => { sheetBase.setEnsureVisible(win.scrollToRow); }, [win.scrollToRow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
@@ -74,7 +77,7 @@ export default function StockSheet() {
         </>
       }
     >
-      <div className="sheet-scroll" data-testid="stock-grid">
+      <div className="sheet-scroll" data-testid="stock-grid" ref={win.scrollRef} onScroll={win.onScroll}>
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3E6E85] text-white">
@@ -106,8 +109,11 @@ export default function StockSheet() {
             )}
           </thead>
           <tbody>
-            {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" data-testid={`stock-row-${idx}`}>
+            {win.padTop > 0 && (
+              <tr aria-hidden style={{ height: win.padTop }}><td colSpan={columns.length + 2} /></tr>
+            )}
+            {sheet.filtered.slice(win.start, win.end).map(({ row, idx }) => (
+              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" style={{ height: win.rowHeight }} data-testid={`stock-row-${idx}`}>
                 <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {idx + 1}
                 </td>
@@ -134,6 +140,9 @@ export default function StockSheet() {
                 </td>
               </tr>
             ))}
+            {win.padBottom > 0 && (
+              <tr aria-hidden style={{ height: win.padBottom }}><td colSpan={columns.length + 2} /></tr>
+            )}
           </tbody>
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
