@@ -47,6 +47,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 Full-app redesign + full page layout: navigation moved to a **compact icon rail** (Overview / Conference / Company / Master, `rail-*`) plus **top tabs** for the sheets of the active section (`tab-*`), so any sheet is one click away. Every page now uses `components/SheetFrame.jsx` — compact header, toolbar row, stats strip and a `.sheet-scroll` grid that fills the viewport (no page scroll; sticky header + totals footer) — and each sheet has its own **Full Screen** button (`<page-testid>-fullscreen-btn`). A **light/dark toggle** (`theme-toggle`, `context/ThemeContext.js`, persisted in `ops_theme`) themes the whole app: shell/toolbar (`--shell-*`), sheets (`--sheet-*`) and dashboard (`--dash-*`, `--tone-*`) are all CSS-variable driven. Verified: iteration_10 (frontend 100%); light/dark toolbar pass checked by screenshot.
 
+- 2026-06 Rail regrouped to 3 headings: **Overview** (Dashboard, Parties), **Conference** (Conference Order, Conference Order Summary, Company Order), **Stock** (In House Stock, Company Balance Order, Stock Arrived, Balance Stock). Rail testids are now `rail-overview|conference|stock`. Company Order PDF export drops the ORDERED and IN HOUSE columns (SR / Group / Item / Shade / To order only); the Excel export still has all columns.
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

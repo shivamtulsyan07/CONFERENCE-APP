@@ -9,34 +9,31 @@ export const SECTIONS = [
     id: "overview",
     label: "Overview",
     icon: LayoutDashboard,
-    tabs: [{ to: "/", label: "Dashboard", id: "dashboard" }],
+    tabs: [
+      { to: "/", label: "Dashboard", id: "dashboard" },
+      { to: "/parties", label: "Parties", id: "parties" },
+    ],
   },
   {
     id: "conference",
     label: "Conference",
     icon: Table2,
     tabs: [
-      { to: "/orders", label: "Conference Stock", id: "orders" },
-      { to: "/stock", label: "In House Stock", id: "stock" },
-      { to: "/summary", label: "Order Summary", id: "summary" },
-      { to: "/balance", label: "Balance Stock", id: "balance" },
+      { to: "/orders", label: "Conference Order", id: "orders" },
+      { to: "/summary", label: "Conference Order Summary", id: "summary" },
+      { to: "/company-order", label: "Company Order", id: "company-order" },
     ],
   },
   {
-    id: "company",
-    label: "Company",
-    icon: Factory,
+    id: "stock",
+    label: "Stock",
+    icon: Boxes,
     tabs: [
-      { to: "/company-order", label: "Company Order", id: "company-order" },
+      { to: "/stock", label: "In House Stock", id: "stock" },
       { to: "/company-balance", label: "Company Balance Order", id: "company-balance" },
       { to: "/stock-arrived", label: "Stock Arrived", id: "stock-arrived" },
+      { to: "/balance", label: "Balance Stock", id: "balance" },
     ],
-  },
-  {
-    id: "master",
-    label: "Master",
-    icon: Users,
-    tabs: [{ to: "/parties", label: "Parties", id: "parties" }],
   },
 ];
 

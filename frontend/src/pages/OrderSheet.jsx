@@ -124,7 +124,7 @@ export default function OrderSheet() {
   return (
     <SheetFrame
       testId="order-sheet-page"
-      title="Conference Stock"
+      title="Conference Order"
       subtitle="Tab/Enter to move · click-drag a range then Cmd/Ctrl + C/X/V · drag the blue corner to fill down · click the SR number to change row colour"
       actions={actions}
     >
