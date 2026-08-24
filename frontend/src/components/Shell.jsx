@@ -7,7 +7,7 @@ import { Button } from "./ui/button";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
   { to: "/orders", label: "Conference Order", icon: Table2, id: "orders" },
-  { to: "/stock", label: "Stock Entry", icon: Boxes, id: "stock" },
+  { to: "/stock", label: "In House Order", icon: Boxes, id: "stock" },
   { to: "/balance", label: "Balance Stock", icon: Scale, id: "balance" },
   { to: "/parties", label: "Parties", icon: Users, id: "parties" },
 ];
@@ -26,7 +26,7 @@ export const Shell = () => {
           data-testid={`nav-${n.id}`}
           onClick={() => setOpen(false)}
           className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200 ${
+            `flex items-center gap-3 px-3 py-2 rounded-md text-sm uppercase tracking-wide transition-colors duration-200 ${
               isActive
                 ? "bg-primary text-primary-foreground font-medium"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"

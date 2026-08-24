@@ -51,18 +51,18 @@ export default function StockSheet() {
     <div data-testid="stock-sheet-page">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Stock Entry</h1>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">In House Order</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Each Item + Shade is one stock line · paste from Excel · Tab/Enter to move
+            Each Item + Shade is one line · paste from Excel · Tab/Enter to move
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 uppercase">
           <Button variant="outline" data-testid="stock-toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> Filters
+            <Filter className="h-4 w-4 mr-1" /> FILTERS
           </Button>
           <Button data-testid="save-stock-sheet-btn" onClick={handleSave} disabled={sheet.saving}>
             <Save className="h-4 w-4 mr-1" />
-            {sheet.saving ? "Saving…" : `Save${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
+            {sheet.saving ? "SAVING…" : `SAVE${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
           </Button>
         </div>
       </div>

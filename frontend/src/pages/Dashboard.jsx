@@ -37,7 +37,7 @@ export default function Dashboard() {
         testId="dashboard-page"
         title="Operations Dashboard"
         subtitle="Conference order, stock readiness and party-wise dispatch position"
-        action={<Button variant="outline" data-testid="seed-btn" onClick={seed}>Load sample data</Button>}
+        action={<Button variant="outline" data-testid="seed-btn" onClick={seed}>LOAD SAMPLE DATA</Button>}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

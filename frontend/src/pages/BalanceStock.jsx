@@ -50,19 +50,19 @@ export default function BalanceStock() {
         <div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Balance Stock</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Stock sheet quantity minus conference order quantity, matched on Item + Shade · red means short
+            In House Order quantity minus Conference Order quantity, matched on Item + Shade · red means short
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 uppercase">
           <Button
             variant={onlyShort ? "default" : "outline"}
             data-testid="only-short-btn"
             onClick={() => setOnlyShort((s) => !s)}
           >
-            Short only ({data.short_lines})
+            SHORT ONLY ({data.short_lines})
           </Button>
           <Button variant="outline" data-testid="refresh-balance-btn" onClick={load}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            <RefreshCw className="h-4 w-4 mr-1" /> REFRESH
           </Button>
         </div>
       </div>

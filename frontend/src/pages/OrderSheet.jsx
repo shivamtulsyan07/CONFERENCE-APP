@@ -73,7 +73,7 @@ export default function OrderSheet() {
     try {
       await api.autoStatus();
       await sheet.refresh();
-      toast.success("Row colours updated from stock sheet");
+      toast.success("Row colours updated from In House Order stock");
     } catch (e) { toast.error(errMsg(e)); }
   };
 
@@ -94,16 +94,16 @@ export default function OrderSheet() {
             Type and Tab/Enter like Excel · paste directly from a spreadsheet · click the SR number to change row colour
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 uppercase">
           <Button variant="outline" data-testid="toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> Filters
+            <Filter className="h-4 w-4 mr-1" /> FILTERS
           </Button>
           <Button variant="outline" data-testid="auto-status-btn" onClick={autoMark}>
-            <Wand2 className="h-4 w-4 mr-1" /> Auto colour from stock
+            <Wand2 className="h-4 w-4 mr-1" /> AUTO COLOUR FROM IN HOUSE STOCK
           </Button>
           <Button data-testid="save-sheet-btn" onClick={handleSave} disabled={sheet.saving}>
             <Save className="h-4 w-4 mr-1" />
-            {sheet.saving ? "Saving…" : `Save${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
+            {sheet.saving ? "SAVING…" : `SAVE${sheet.dirtyCount ? ` (${sheet.dirtyCount})` : ""}`}
           </Button>
         </div>
       </div>

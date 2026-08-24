@@ -40,7 +40,7 @@ export default function Parties() {
         subtitle="Names and page numbers used by the Conference Order dropdowns"
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button data-testid="add-party-btn">Add party</Button></DialogTrigger>
+            <DialogTrigger asChild><Button data-testid="add-party-btn">ADD PARTY</Button></DialogTrigger>
             <DialogContent data-testid="party-dialog">
               <DialogHeader><DialogTitle>New party</DialogTitle></DialogHeader>
               <div className="space-y-4">
@@ -52,7 +52,7 @@ export default function Parties() {
                   </div>
                 ))}
               </div>
-              <DialogFooter><Button data-testid="save-party-btn" onClick={save}>Save party</Button></DialogFooter>
+              <DialogFooter><Button data-testid="save-party-btn" onClick={save}>SAVE PARTY</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         }
