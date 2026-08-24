@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { RoleProvider } from "@/context/RoleContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Shell } from "@/components/Shell";
 import Dashboard from "@/pages/Dashboard";
 import OrderSheet from "@/pages/OrderSheet";
@@ -16,6 +17,7 @@ import Parties from "@/pages/Parties";
 function App() {
   return (
     <RoleProvider>
+      <ThemeProvider>
       <BrowserRouter>
         <Routes>
           <Route element={<Shell />}>
@@ -31,6 +33,7 @@ function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      </ThemeProvider>
       <Toaster position="top-right" richColors />
     </RoleProvider>
   );

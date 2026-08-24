@@ -3,6 +3,7 @@ import { api, errMsg } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { SheetFrame } from "../components/SheetFrame";
 import { SheetContextMenu } from "../components/SheetContextMenu";
 import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
@@ -48,35 +49,32 @@ export default function StockSheet() {
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
   return (
-    <div data-testid="stock-sheet-page">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">In House Stock</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Each Item + Shade is one line · click-drag to select a range, then Cmd/Ctrl + C / X / V · drag the blue corner handle to copy a cell down
-          </p>
-        </div>
-        <div className="flex gap-2 uppercase items-center flex-wrap">
+    <SheetFrame
+      testId="stock-sheet-page"
+      title="In House Stock"
+      subtitle="Each Group + Item + Shade is one line · click-drag a range then Cmd/Ctrl + C/X/V · drag the blue corner to fill down"
+      actions={
+        <>
           <SheetToolbar sheet={sheet} prefix="stock-" />
           <Input
             data-testid="stock-global-search"
             value={sheet.search}
             onChange={(e) => sheet.setSearch(e.target.value)}
             placeholder="SEARCH ANY COLUMN"
-            className="h-9 w-52 text-xs"
+            className="h-8 w-44 text-xs"
           />
-          <Button variant="outline" data-testid="stock-toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="stock-toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="h-3.5 w-3.5 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
           </Button>
           {sheet.filterCount > 0 && (
-            <Button variant="outline" data-testid="stock-clear-filters-btn" onClick={sheet.clearFilters}>
-              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS
+            <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="stock-clear-filters-btn" onClick={sheet.clearFilters}>
+              <FilterX className="h-3.5 w-3.5 mr-1" /> CLEAR
             </Button>
           )}
-        </div>
-      </div>
-
-      <div className="grid-panel overflow-auto max-h-[70vh] max-w-5xl" data-testid="stock-grid">
+        </>
+      }
+    >
+      <div className="sheet-scroll" data-testid="stock-grid">
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3E6E85] text-white">
@@ -90,10 +88,10 @@ export default function StockSheet() {
               <th className="w-14 px-2 py-2 text-xs font-semibold">Del</th>
             </tr>
             {showFilters && (
-              <tr className="bg-[#eef2f7]">
+              <tr className="bg-[color:var(--sheet-head2)]">
                 <th />
                 {columns.map((c) => (
-                  <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                  <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)] p-1">
                     <FilterPopover
                       column={c}
                       filter={sheet.filters[c.key]}
@@ -103,14 +101,14 @@ export default function StockSheet() {
                     />
                   </th>
                 ))}
-                <th className="border-b border-[#c9d3e0]" />
+                <th className="border-b border-[color:var(--sheet-border)]" />
               </tr>
             )}
           </thead>
           <tbody>
             {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} className="bg-white" data-testid={`stock-row-${idx}`}>
-                <td className="border-r border-b border-[#c9d3e0] text-center text-[10px] text-muted-foreground h-8">
+              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" data-testid={`stock-row-${idx}`}>
+                <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {idx + 1}
                 </td>
                 {columns.map((c, ci) => (
@@ -128,7 +126,7 @@ export default function StockSheet() {
                     onPaste={sheet.onPaste}
                   />
                 ))}
-                <td className="border-b border-[#c9d3e0] text-center">
+                <td className="border-b border-[color:var(--sheet-border)] text-center">
                   <button data-testid={`stock-delete-row-${idx}`} onClick={() => sheet.deleteRow(idx)}
                     className="p-1 hover:text-destructive transition-colors duration-150">
                     <Trash2 className="h-3.5 w-3.5" />
@@ -157,6 +155,6 @@ export default function StockSheet() {
         setHidden={setHidden}
         columns={allColumns}
       />
-    </div>
+    </SheetFrame>
   );
 }

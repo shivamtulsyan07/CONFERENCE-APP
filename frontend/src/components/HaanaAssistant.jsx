@@ -79,7 +79,7 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
     <div className="flex h-full min-h-0 flex-col" data-testid="haana-assistant">
       <div ref={boxRef} className="min-h-0 flex-1 overflow-auto px-3 py-2 space-y-2">
         {msgs.length === 0 && (
-          <div className="text-[11px] text-[#67778e] mono leading-relaxed">
+          <div className="text-[11px] text-[color:var(--dash-dim)] mono leading-relaxed">
             Ask HAANA anything about your live sheets — pending at company, party position, what to order.
           </div>
         )}
@@ -89,11 +89,11 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
             data-testid={`haana-msg-${m.role}-${i}`}
             className={`text-xs leading-relaxed whitespace-pre-wrap border-l-2 pl-2 py-1 ${
               m.role === "user"
-                ? "border-[#63A9FF] text-[#9fc4f5]"
-                : "border-[#2c3a4d] text-[#d8e2ef]"
+                ? "border-[color:var(--tone-accent)] text-[color:var(--tone-accent)]"
+                : "border-[color:var(--dash-line)] text-[color:var(--dash-text)]"
             }`}
           >
-            <span className="mono text-[9px] uppercase tracking-[0.16em] text-[#5b6b81] block mb-0.5">
+            <span className="mono text-[9px] uppercase tracking-[0.16em] text-[color:var(--dash-dim)] block mb-0.5">
               {m.role === "user" ? "You" : "Haana"}
             </span>
             {m.text || (busy ? "…" : "")}
@@ -101,7 +101,7 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
         ))}
       </div>
 
-      <div className="shrink-0 border-t border-[#1e2836] px-3 py-2">
+      <div className="shrink-0 border-t border-[color:var(--dash-line)] px-3 py-2">
         <div className="flex flex-wrap gap-1.5 mb-2">
           {chips.map((c, i) => (
             <button
@@ -109,14 +109,14 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
               data-testid={`haana-chip-${i}`}
               disabled={busy}
               onClick={() => ask(c)}
-              className="border border-[#243044] px-2 py-1 text-[10px] text-[#8fa2ba] hover:border-[#63A9FF] hover:text-white transition-colors duration-200 disabled:opacity-40"
+              className="border border-[color:var(--dash-line)] px-2 py-1 text-[10px] text-[color:var(--dash-dim)] hover:border-[color:var(--tone-accent)] hover:text-white transition-colors duration-200 disabled:opacity-40"
             >
               {c}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-[#63A9FF] shrink-0" />
+          <Sparkles className="h-3.5 w-3.5 text-[color:var(--tone-accent)] shrink-0" />
           <input
             data-testid="haana-input"
             value={q}
@@ -124,13 +124,13 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && ask()}
             placeholder={busy ? "Haana is thinking…" : "Ask about your data…"}
-            className="flex-1 bg-transparent text-xs text-[#e8edf5] placeholder:text-[#4d5c72] outline-none py-1"
+            className="flex-1 bg-transparent text-xs text-[color:var(--dash-text)] placeholder:text-[color:var(--dash-dim)] outline-none py-1"
           />
           <button
             data-testid="haana-send"
             disabled={busy}
             onClick={() => ask()}
-            className="border border-[#63A9FF] px-2 py-1 text-[#63A9FF] hover:bg-[#63A9FF] hover:text-[#07111f] transition-colors duration-200 disabled:opacity-40"
+            className="border border-[color:var(--tone-accent)] px-2 py-1 text-[color:var(--tone-accent)] hover:bg-[color:var(--tone-accent)] hover:text-[color:var(--dash-bg)] transition-colors duration-200 disabled:opacity-40"
           >
             <SendHorizonal className="h-3.5 w-3.5" />
           </button>

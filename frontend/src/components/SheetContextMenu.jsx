@@ -41,7 +41,7 @@ export const SheetContextMenu = ({ menu, close, sheet, hidden, setHidden, column
     <div
       data-testid="sheet-context-menu"
       onClick={(e) => e.stopPropagation()}
-      className="fixed z-50 w-60 py-1 bg-white border border-border rounded-md shadow-lg rise"
+      className="fixed z-50 w-60 py-1 bg-[color:var(--sheet-bg)] border border-border rounded-md shadow-lg rise"
       style={{ left: Math.min(x, window.innerWidth - 250), top: Math.min(y, window.innerHeight - 380) }}
     >
       <Item testId="ctx-cut" icon={Scissors} label="Cut" hint="⌘X" onClick={run(sheet.cutSelection)} />

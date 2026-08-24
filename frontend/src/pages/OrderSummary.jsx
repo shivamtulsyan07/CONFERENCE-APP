@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useGridFilter } from "../lib/useGridFilter";
 import { FilterPopover } from "../components/FilterPopover";
+import { SheetFrame } from "../components/SheetFrame";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -26,34 +27,31 @@ export default function OrderSummary() {
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
   return (
-    <div data-testid="order-summary-page">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Order Summary</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Item-wise total ordered quantity, grouped by Group + Item + Shade
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 uppercase items-center">
+    <SheetFrame
+      testId="order-summary-page"
+      title="Conference Order Summary"
+      subtitle="Item-wise total ordered quantity, grouped by Group + Item + Shade"
+      actions={
+        <>
           <Input
             data-testid="summary-global-search"
             value={grid.search}
             onChange={(e) => grid.setSearch(e.target.value)}
             placeholder="SEARCH ANY COLUMN"
-            className="h-9 w-52 text-xs"
+            className="h-8 w-44 text-xs"
           />
           {grid.activeCount > 0 && (
-            <Button variant="outline" data-testid="summary-clear-filters-btn" onClick={grid.clearAll}>
-              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS ({grid.activeCount})
+            <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="summary-clear-filters-btn" onClick={grid.clearAll}>
+              <FilterX className="h-3.5 w-3.5 mr-1" /> CLEAR ({grid.activeCount})
             </Button>
           )}
-          <Button variant="outline" data-testid="refresh-summary-btn" onClick={load}>
-            <RefreshCw className="h-4 w-4 mr-1" /> REFRESH
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="refresh-summary-btn" onClick={load}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> REFRESH
           </Button>
-        </div>
-      </div>
-
-      <div className="grid-panel overflow-auto max-h-[72vh] max-w-4xl" data-testid="summary-grid">
+        </>
+      }
+    >
+      <div className="sheet-scroll" data-testid="summary-grid">
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3F6F52] text-white">
@@ -71,10 +69,10 @@ export default function OrderSummary() {
                 </th>
               ))}
             </tr>
-            <tr className="bg-[#eef2f7]">
+            <tr className="bg-[color:var(--sheet-head2)]">
               <th />
               {columns.map((c) => (
-                <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)] p-1">
                   <FilterPopover
                     column={c}
                     filter={grid.filters[c.key]}
@@ -99,16 +97,16 @@ export default function OrderSummary() {
             {grid.visible.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
-                className="row-hover bg-white"
+                className="row-hover bg-[color:var(--sheet-bg)]"
                 data-testid={`summary-row-${i}`}
               >
-                <td className="border-r border-b border-[#c9d3e0] text-center text-[10px] text-muted-foreground h-8">
+                <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {i + 1}
                 </td>
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`border-r border-b border-[#c9d3e0] px-2 text-sm mono ${
+                    className={`border-r border-b border-[color:var(--sheet-border)] px-2 text-sm mono ${
                       c.numeric ? "text-right font-semibold" : ""
                     }`}
                     data-testid={`summary-cell-${i}-${c.key}`}
@@ -128,6 +126,6 @@ export default function OrderSummary() {
           </tfoot>
         </table>
       </div>
-    </div>
+    </SheetFrame>
   );
 }

@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only regression for the redesign (icon rail + top tabs + SheetFrame + theme toggle). Verified navigation via rail-overview/conference/company/master lands on first tab of section; every top tab (dashboard/orders/stock/summary/balance/company-order/company-balance/stock-arrived/parties) navigates and highlights active. Every sheet has its expected fullscreen testid: order-sheet-page-fullscreen-btn, stock-sheet-page-fullscreen-btn, order-summary-page-fullscreen-btn, balance-stock-page-fullscreen-btn, company-order-page-fullscreen-btn, cb-page-fullscreen-btn, sa-page-fullscreen-btn, parties-page-fullscreen-btn. Fullscreen toggles Full screen<->Exit label correctly. Body/html do not scroll on any sheet page (grid scrolls inside .sheet-scroll) at 1920x1080. Theme toggle switches html.dark class, persists in localStorage under ops_theme, survives reload; sheets remain readable in both themes (light: white background with dark text; dark: navy sheet with light text). Excel grid regression on /orders passed: typing autosaves (cell-0-qty updated), status-toggle-0 cycled row bg from white to yellow (STATUS_META), auto-status-btn fires, global-search filters to 12 rows for RAVE, sticky totals footer shows total-qty=890. Company Order export buttons export-excel-btn and export-pdf-btn present. Company Balance Order and Stock Arrived line sheets load with all cb-*/sa-* stat testids (values are 0 because no records seeded yet - not a bug). Balance Stock and Order Summary load and search works (summary shows 685 lines, 960 qty). Parties list renders party-row-* rows with add-party-btn. Dashboard renders inside new shell with filter bar, KPI drill-downs, Haana panel; asked Haana one question via haana-chip-0 - streamed a full answer using real snapshot data (haana-msg-user-0 + haana-msg-assistant-1 rendered). Mobile 390px: no horizontal overflow, menu-toggle opens mobile-nav with all 9 m-tab-* entries; m-tab-orders navigates to /orders and grid still renders with sticky header + footer.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/orders (and other grids) - dark theme", "issues": ["Placeholder text 'SEARCH ANY COLUMN' in global-search inputs is low-contrast on the dark sheet toolbar; still legible but could be lifted with placeholder colour var."]},
+      {"screen": "Company Balance Order / Stock Arrived", "issues": ["Stat strip values are all 0 because no CB/SA rows are seeded. Not a bug, but noting so main agent knows this iteration could not visually verify 'numbers > 0' for these two strips."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_10.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ThemeContext defaults to 'light' but the outer Shell uses hardcoded --shell-bg (dark navy) that is defined identically under :root and .dark. That is intentional (dark shell + light sheet), yet it means the 'Dark/Light' button really only toggles the sheet surface, not the shell chrome. Consider renaming the button label to 'Light sheets / Dark sheets' to match Shell.jsx tooltip and reduce user confusion.",
+    "SheetFrame.jsx toggleFull relies on document.fullscreenElement but also has a manual setFull fallback in the catch. If requestFullscreen rejects (e.g. iframe policy), we end up with full=true but no real fullscreen; the fixed inset-0 CSS still covers the viewport which is fine, but the fullscreenchange listener will never flip it back. Consider setting a stable flag independent of the browser API.",
+    "Shell.jsx duplicates the tab list in mobile-nav and top-tabs, but the mobile drawer shows every tab from every section flat while the desktop top bar only shows the active section's tabs; that is a UX inconsistency worth documenting."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100% of listed flows"},
+  "seed_data_creation": "None. Used existing seed (812 order rows, 10 parties). CB/SA remain empty.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Testids in the new shell: rail-{overview|conference|company|master}, tab-{dashboard|orders|stock|summary|balance|company-order|company-balance|stock-arrived|parties}, m-tab-* (mobile), menu-toggle, mobile-nav, icon-rail, top-tabs, theme-toggle. Per-page fullscreen: order-sheet-page-fullscreen-btn, stock-sheet-page-fullscreen-btn, order-summary-page-fullscreen-btn, balance-stock-page-fullscreen-btn, company-order-page-fullscreen-btn, cb-page-fullscreen-btn, sa-page-fullscreen-btn, parties-page-fullscreen-btn. Theme persisted in localStorage under 'ops_theme' ('light'|'dark') and applied via html.dark class. Only 1 Haana LLM call was made this iteration.",
+  "rca of the issue": "No new bug found this iteration. Prior iteration 9 minor bug (dashboard_overview `applied` echo shadowing) is backend-only and was intentionally skipped this run."
+}

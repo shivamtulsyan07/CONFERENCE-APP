@@ -5,6 +5,7 @@ import { SheetCell, Datalists } from "./SheetCell";
 import { SheetToolbar } from "./SheetToolbar";
 import { SheetContextMenu } from "./SheetContextMenu";
 import { FilterPopover } from "./FilterPopover";
+import { SheetFrame, StatStrip } from "./SheetFrame";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ export const LineSheet = ({
   extraValue,
   onSaved,
   toolbarExtras,
+  stats,
 }) => {
   const [lookups, setLookups] = useState({ groups: [], items: [], shades: [] });
   const [showFilters, setShowFilters] = useState(true);
@@ -73,34 +75,34 @@ export const LineSheet = ({
   const totalQty = sheet.filtered.reduce((a, { row }) => a + (Number(row.quantity) || 0), 0);
 
   return (
-    <div data-testid={`${prefix}page`}>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
-        </div>
-        <div className="flex flex-wrap gap-2 uppercase items-center">
+    <SheetFrame
+      testId={`${prefix}page`}
+      title={title}
+      subtitle={subtitle}
+      stats={stats}
+      actions={
+        <>
           <SheetToolbar sheet={sheet} prefix={prefix} />
           <Input
             data-testid={`${prefix}global-search`}
             value={sheet.search}
             onChange={(e) => sheet.setSearch(e.target.value)}
             placeholder="SEARCH ANY COLUMN"
-            className="h-9 w-48 text-xs"
+            className="h-8 w-40 text-xs"
           />
-          <Button variant="outline" data-testid={`${prefix}toggle-filters-btn`} onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid={`${prefix}toggle-filters-btn`} onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="h-3.5 w-3.5 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
           </Button>
           {sheet.filterCount > 0 && (
-            <Button variant="outline" data-testid={`${prefix}clear-filters-btn`} onClick={sheet.clearFilters}>
-              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS
+            <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid={`${prefix}clear-filters-btn`} onClick={sheet.clearFilters}>
+              <FilterX className="h-3.5 w-3.5 mr-1" /> CLEAR
             </Button>
           )}
           {toolbarExtras}
-        </div>
-      </div>
-
-      <div className="grid-panel overflow-auto max-h-[68vh]" data-testid={`${prefix}grid`}>
+        </>
+      }
+    >
+      <div className="sheet-scroll" data-testid={`${prefix}grid`}>
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="text-white" style={{ background: headerColor }}>
@@ -120,10 +122,10 @@ export const LineSheet = ({
               <th className="w-14 px-2 py-2 text-xs font-semibold">Del</th>
             </tr>
             {showFilters && (
-              <tr className="bg-[#eef2f7]">
+              <tr className="bg-[color:var(--sheet-head2)]">
                 <th />
                 {columns.map((c) => (
-                  <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                  <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)] p-1">
                     <FilterPopover
                       column={c}
                       filter={sheet.filters[c.key]}
@@ -134,16 +136,16 @@ export const LineSheet = ({
                   </th>
                 ))}
                 {extraColumns.map((c) => (
-                  <th key={c.key} className="border-r border-b border-[#c9d3e0]" />
+                  <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)]" />
                 ))}
-                <th className="border-b border-[#c9d3e0]" />
+                <th className="border-b border-[color:var(--sheet-border)]" />
               </tr>
             )}
           </thead>
           <tbody>
             {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} className="bg-white" data-testid={`${prefix}row-${idx}`}>
-                <td className="border-r border-b border-[#c9d3e0] text-center text-[10px] text-muted-foreground h-8">
+              <tr key={row.id || row._local || idx} className="bg-[color:var(--sheet-bg)]" data-testid={`${prefix}row-${idx}`}>
+                <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {idx + 1}
                 </td>
                 {columns.map((c, ci) => (
@@ -167,7 +169,7 @@ export const LineSheet = ({
                     <td
                       key={c.key}
                       data-testid={`${prefix}extra-${idx}-${c.key}`}
-                      className={`border-r border-b border-[#c9d3e0] px-2 text-sm mono text-right font-semibold ${
+                      className={`border-r border-b border-[color:var(--sheet-border)] px-2 text-sm mono text-right font-semibold ${
                         c.key === "balance_qty" && Number(v) > 0 ? "text-[#0066FF]" : ""
                       }`}
                     >
@@ -175,7 +177,7 @@ export const LineSheet = ({
                     </td>
                   );
                 })}
-                <td className="border-b border-[#c9d3e0] text-center">
+                <td className="border-b border-[color:var(--sheet-border)] text-center">
                   <button data-testid={`${prefix}delete-row-${idx}`} onClick={() => sheet.deleteRow(idx)}
                     className="p-1 hover:text-destructive transition-colors duration-150">
                     <Trash2 className="h-3.5 w-3.5" />
@@ -206,6 +208,6 @@ export const LineSheet = ({
         setHidden={setHidden}
         columns={allColumns}
       />
-    </div>
+    </SheetFrame>
   );
 };

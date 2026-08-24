@@ -3,6 +3,7 @@ import { api, errMsg, money, STATUS_META } from "../lib/api";
 import { useSheet } from "../lib/useSheet";
 import { SheetCell, Datalists } from "../components/SheetCell";
 import { SheetToolbar } from "../components/SheetToolbar";
+import { SheetFrame } from "../components/SheetFrame";
 import { SheetContextMenu } from "../components/SheetContextMenu";
 import { FilterPopover } from "../components/FilterPopover";
 import { Button } from "../components/ui/button";
@@ -88,47 +89,46 @@ export default function OrderSheet() {
     { qty: 0, amount: 0 }
   );
 
-  return (
-    <div data-testid="order-sheet-page">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Conference Stock</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Type and Tab/Enter like Excel · click-drag to select a range, then Cmd/Ctrl + C / X / V · drag the blue corner handle to copy a cell down · click the SR number to change row colour
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 uppercase items-center">
-          <SheetToolbar sheet={sheet} />
-          <Input
-            data-testid="global-search"
-            value={sheet.search}
-            onChange={(e) => sheet.setSearch(e.target.value)}
-            placeholder="SEARCH ANY COLUMN"
-            className="h-9 w-52 text-xs"
-          />
-          <Button variant="outline" data-testid="toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
-            <Filter className="h-4 w-4 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
-          </Button>
-          {sheet.filterCount > 0 && (
-            <Button variant="outline" data-testid="clear-filters-btn" onClick={sheet.clearFilters}>
-              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS
-            </Button>
-          )}
-          <Button variant="outline" data-testid="auto-status-btn" onClick={autoMark}>
-            <Wand2 className="h-4 w-4 mr-1" /> AUTO COLOUR FROM IN HOUSE STOCK          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-4 mb-3 text-xs">
+  const actions = (
+    <>
+      <SheetToolbar sheet={sheet} />
+      <Input
+        data-testid="global-search"
+        value={sheet.search}
+        onChange={(e) => sheet.setSearch(e.target.value)}
+        placeholder="SEARCH ANY COLUMN"
+        className="h-8 w-44 text-xs"
+      />
+      <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="toggle-filters-btn" onClick={() => setShowFilters((s) => !s)}>
+        <Filter className="h-3.5 w-3.5 mr-1" /> FILTERS{sheet.filterCount ? ` (${sheet.filterCount})` : ""}
+      </Button>
+      {sheet.filterCount > 0 && (
+        <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="clear-filters-btn" onClick={sheet.clearFilters}>
+          <FilterX className="h-3.5 w-3.5 mr-1" /> CLEAR
+        </Button>
+      )}
+      <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="auto-status-btn" onClick={autoMark}>
+        <Wand2 className="h-3.5 w-3.5 mr-1" /> AUTO COLOUR
+      </Button>
+      <span className="flex items-center gap-3 pl-1">
         {Object.entries(STATUS_META).map(([k, m]) => (
-          <span key={k} className="flex items-center gap-2" data-testid={`legend-${k}`}>
-            <span className="h-3 w-5 border border-[#c9d3e0]" style={{ background: m.color }} />
-            {m.text}
+          <span key={k} className="flex items-center gap-1 text-[10px] text-muted-foreground" data-testid={`legend-${k}`}>
+            <span className="h-2.5 w-4 border border-[color:var(--sheet-border)]" style={{ background: m.color }} />
+            {m.label}
           </span>
         ))}
-      </div>
+      </span>
+    </>
+  );
 
-      <div className="grid-panel overflow-auto max-h-[70vh]" data-testid="order-grid">
+  return (
+    <SheetFrame
+      testId="order-sheet-page"
+      title="Conference Stock"
+      subtitle="Tab/Enter to move · click-drag a range then Cmd/Ctrl + C/X/V · drag the blue corner to fill down · click the SR number to change row colour"
+      actions={actions}
+    >
+      <div className="sheet-scroll" data-testid="order-grid">
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#3F6F52] text-white">
@@ -142,10 +142,10 @@ export default function OrderSheet() {
               <th className="w-16 px-2 py-2 text-xs font-semibold">Del</th>
             </tr>
             {showFilters && (
-              <tr className="bg-[#eef2f7]">
+              <tr className="bg-[color:var(--sheet-head2)]">
                 <th />
                 {columns.map((c) => (
-                  <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                  <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)] p-1">
                     <FilterPopover
                       column={c}
                       filter={sheet.filters[c.key]}
@@ -154,15 +154,15 @@ export default function OrderSheet() {
                     />
                   </th>
                 ))}
-                <th className="border-b border-[#c9d3e0]" />
+                <th className="border-b border-[color:var(--sheet-border)]" />
               </tr>
             )}
           </thead>
           <tbody>
             {sheet.filtered.map(({ row, idx }) => (
-              <tr key={row.id || row._local || idx} style={{ background: STATUS_META[row.status || "not_ready"].color }}
+              <tr key={row.id || row._local || idx} className="text-[#0A2540]" style={{ background: STATUS_META[row.status || "not_ready"].color }}
                 data-testid={`order-row-${idx}`}>
-                <td className="border-r border-b border-[#c9d3e0] text-center p-0">
+                <td className="border-r border-b border-[color:var(--sheet-border)] text-center p-0">
                   <button
                     data-testid={`status-toggle-${idx}`}
                     title={STATUS_META[row.status || "not_ready"].text}
@@ -187,7 +187,7 @@ export default function OrderSheet() {
                     onPaste={sheet.onPaste}
                   />
                 ))}
-                <td className="border-b border-[#c9d3e0] text-center">
+                <td className="border-b border-[color:var(--sheet-border)] text-center">
                   <button data-testid={`delete-row-${idx}`} onClick={() => sheet.deleteRow(idx)}
                     className="p-1 hover:text-destructive transition-colors duration-150">
                     <Trash2 className="h-3.5 w-3.5" />
@@ -217,6 +217,6 @@ export default function OrderSheet() {
         setHidden={setHidden}
         columns={allColumns}
       />
-    </div>
+    </SheetFrame>
   );
 }

@@ -9,11 +9,11 @@ import { Maximize2, Minimize2, RefreshCw, AlertTriangle, Factory, Boxes, Users, 
 const N = (n) => Number(n || 0).toLocaleString("en-IN");
 
 const TONES = {
-  base: "text-[#e8edf5]",
-  good: "text-[#7CE28A]",
-  warn: "text-[#FFC44D]",
-  bad: "text-[#FF6B6B]",
-  accent: "text-[#63A9FF]",
+  base: "text-[color:var(--dash-text)]",
+  good: "text-[color:var(--tone-good)]",
+  warn: "text-[color:var(--tone-warn)]",
+  bad: "text-[color:var(--tone-bad)]",
+  accent: "text-[color:var(--tone-accent)]",
 };
 
 const Tile = ({ label, value, sub, tone = "base", testId, onClick }) => (
@@ -21,53 +21,53 @@ const Tile = ({ label, value, sub, tone = "base", testId, onClick }) => (
     type="button"
     data-testid={testId}
     onClick={onClick}
-    className="group relative text-left border border-[#1e2836] bg-[#0d131c] px-3 py-2.5 transition-colors duration-200 hover:border-[#63A9FF] hover:bg-[#111925]"
+    className="group relative text-left border border-[color:var(--dash-line)] bg-[color:var(--dash-head)] px-3 py-2.5 transition-colors duration-200 hover:border-[color:var(--tone-accent)] hover:bg-[color:var(--dash-hover)]"
   >
     <div className="flex items-center justify-between gap-1">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-[#67778e] truncate">{label}</span>
-      <ChevronRight className="h-3 w-3 text-[#33445c] group-hover:text-[#63A9FF] transition-colors duration-200" />
+      <span className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--dash-dim)] truncate">{label}</span>
+      <ChevronRight className="h-3 w-3 text-[color:var(--dash-line)] group-hover:text-[color:var(--tone-accent)] transition-colors duration-200" />
     </div>
     <div className={`mt-1 text-xl lg:text-2xl font-black leading-none mono ${TONES[tone]}`}>{value}</div>
-    {sub ? <div className="mt-1 text-[10px] text-[#5b6b81] truncate mono">{sub}</div> : null}
-    <span className="absolute left-0 top-0 h-full w-[2px] bg-[#1e2836] group-hover:bg-[#63A9FF] transition-colors duration-200" />
+    {sub ? <div className="mt-1 text-[10px] text-[color:var(--dash-dim)] truncate mono">{sub}</div> : null}
+    <span className="absolute left-0 top-0 h-full w-[2px] bg-[color:var(--dash-line)] group-hover:bg-[color:var(--tone-accent)] transition-colors duration-200" />
   </button>
 );
 
 const Panel = ({ title, icon: Icon, right, children, testId, className = "" }) => (
-  <section data-testid={testId} className={`flex flex-col min-h-0 border border-[#1e2836] bg-[#0b1017] ${className}`}>
-    <header className="flex items-center justify-between gap-2 border-b border-[#1e2836] px-3 py-2 bg-[#0d131c] shrink-0">
+  <section data-testid={testId} className={`flex flex-col min-h-0 border border-[color:var(--dash-line)] bg-[color:var(--dash-panel)] ${className}`}>
+    <header className="flex items-center justify-between gap-2 border-b border-[color:var(--dash-line)] px-3 py-2 bg-[color:var(--dash-head)] shrink-0">
       <div className="flex items-center gap-2">
-        {Icon ? <Icon className="h-3.5 w-3.5 text-[#63A9FF]" /> : null}
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#c3cede]">{title}</h3>
+        {Icon ? <Icon className="h-3.5 w-3.5 text-[color:var(--tone-accent)]" /> : null}
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--dash-text)]">{title}</h3>
       </div>
-      <div className="text-[10px] mono text-[#5b6b81]">{right}</div>
+      <div className="text-[10px] mono text-[color:var(--dash-dim)]">{right}</div>
     </header>
     <div className="min-h-0 flex-1 overflow-auto">{children}</div>
   </section>
 );
 
 const Th = ({ children, right }) => (
-  <th className={`sticky top-0 z-10 bg-[#101825] border-b border-[#1e2836] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7d8ea6] whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
+  <th className={`sticky top-0 z-10 bg-[color:var(--dash-head)] border-b border-[color:var(--dash-line)] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[color:var(--dash-dim)] whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
     {children}
   </th>
 );
 
 const Td = ({ children, right, tone, mono = true }) => (
-  <td className={`border-b border-[#161f2b] px-2 py-1.5 text-xs whitespace-nowrap ${right ? "text-right" : ""} ${mono ? "mono" : ""} ${tone || "text-[#c8d3e2]"}`}>
+  <td className={`border-b border-[color:var(--dash-line)] px-2 py-1.5 text-xs whitespace-nowrap ${right ? "text-right" : ""} ${mono ? "mono" : ""} ${tone || "text-[color:var(--dash-text)]"}`}>
     {children}
   </td>
 );
 
-const Empty = ({ text }) => <p className="px-3 py-4 text-xs text-[#5b6b81]">{text}</p>;
+const Empty = ({ text }) => <p className="px-3 py-4 text-xs text-[color:var(--dash-dim)]">{text}</p>;
 
 const Select = ({ label, value, options, onChange, testId }) => (
   <label className="flex items-center gap-1.5">
-    <span className="text-[10px] uppercase tracking-[0.14em] text-[#5b6b81]">{label}</span>
+    <span className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--dash-dim)]">{label}</span>
     <select
       data-testid={testId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-7 max-w-[190px] border border-[#243044] bg-[#0d131c] px-2 text-[11px] text-[#d8e2ef] outline-none focus:border-[#63A9FF] transition-colors duration-200"
+      className="h-7 max-w-[190px] border border-[color:var(--dash-line)] bg-[color:var(--dash-head)] px-2 text-[11px] text-[color:var(--dash-text)] outline-none focus:border-[color:var(--tone-accent)] transition-colors duration-200"
     >
       <option value="">ALL</option>
       {options.map((o) => (
@@ -145,34 +145,34 @@ export default function Dashboard() {
     <div
       ref={wrapRef}
       data-testid="dashboard-page"
-      className={`bg-[#070b11] text-[#e8edf5] ${
-        full ? "fixed inset-0 z-[60] overflow-auto p-3" : "-m-4 lg:-m-8 p-3 lg:p-5 min-h-[calc(100vh-3.5rem)]"
+      className={`bg-[color:var(--dash-bg)] text-[color:var(--dash-text)] overflow-auto h-full ${
+        full ? "fixed inset-0 z-[60] p-3" : "p-2"
       }`}
     >
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#1e2836] pb-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[color:var(--dash-line)] pb-3">
         <div>
           <h1 className="text-lg lg:text-2xl font-black tracking-tight uppercase">Operations Control Room</h1>
-          <p className="text-[11px] text-[#67778e] mono mt-0.5">conference demand · in-house stock · company pipeline</p>
+          <p className="text-[11px] text-[color:var(--dash-dim)] mono mt-0.5">conference demand · in-house stock · company pipeline</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" data-testid="seed-btn" onClick={seed}
-            className="h-8 border-[#243044] bg-transparent text-[11px] uppercase tracking-wide text-[#a8b6c9] hover:bg-[#131c28] hover:text-white">
+            className="h-8 border-[color:var(--dash-line)] bg-transparent text-[11px] uppercase tracking-wide text-[color:var(--dash-dim)] hover:bg-[color:var(--dash-hover)] hover:text-white">
             Load sample data
           </Button>
           <Button variant="outline" size="sm" data-testid="refresh-btn" onClick={() => load()}
-            className="h-8 border-[#243044] bg-transparent text-[11px] uppercase tracking-wide text-[#a8b6c9] hover:bg-[#131c28] hover:text-white">
+            className="h-8 border-[color:var(--dash-line)] bg-transparent text-[11px] uppercase tracking-wide text-[color:var(--dash-dim)] hover:bg-[color:var(--dash-hover)] hover:text-white">
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button size="sm" data-testid="fullscreen-btn" onClick={toggleFull}
-            className="h-8 bg-[#63A9FF] text-[#07111f] text-[11px] font-bold uppercase tracking-wide hover:bg-[#8cc0ff]">
+            className="h-8 bg-[color:var(--tone-accent)] text-[color:var(--dash-bg)] text-[11px] font-bold uppercase tracking-wide hover:bg-[color:var(--tone-accent)]">
             {full ? <Minimize2 className="h-3.5 w-3.5 mr-1.5" /> : <Maximize2 className="h-3.5 w-3.5 mr-1.5" />}
             {full ? "Exit full screen" : "Full screen"}
           </Button>
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3 border border-[#1e2836] bg-[#0b1017] px-3 py-2" data-testid="global-filter-bar">
+      <div className="mt-2 flex flex-wrap items-center gap-3 border border-[color:var(--dash-line)] bg-[color:var(--dash-panel)] px-3 py-2" data-testid="global-filter-bar">
         <Select label="Conference" testId="filter-conference" value={f.conference} options={opts.conferences}
           onChange={(v) => setF((p) => ({ ...p, conference: v }))} />
         <Select label="Group" testId="filter-group" value={f.group} options={opts.groups}
@@ -183,15 +183,15 @@ export default function Dashboard() {
           onChange={(v) => setF((p) => ({ ...p, item: v }))} />
         {filterCount > 0 && (
           <button data-testid="clear-filters-btn" onClick={() => setF({ conference: "", group: "", party: "", item: "" })}
-            className="flex items-center gap-1 border border-[#243044] px-2 py-1 text-[10px] uppercase tracking-wide text-[#FFC44D] hover:border-[#FFC44D] transition-colors duration-200">
+            className="flex items-center gap-1 border border-[color:var(--dash-line)] px-2 py-1 text-[10px] uppercase tracking-wide text-[color:var(--tone-warn)] hover:border-[color:var(--tone-warn)] transition-colors duration-200">
             <FilterX className="h-3 w-3" /> Clear ({filterCount})
           </button>
         )}
-        <span className="text-[10px] mono text-[#4d5c72] ml-auto">filters apply to every tile & table</span>
+        <span className="text-[10px] mono text-[color:var(--dash-dim)] ml-auto">filters apply to every tile & table</span>
       </div>
 
       {!d ? (
-        <p className="mt-6 text-xs text-[#5b6b81] mono">Loading dashboard…</p>
+        <p className="mt-6 text-xs text-[color:var(--dash-dim)] mono">Loading dashboard…</p>
       ) : (
         <>
           <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
@@ -217,14 +217,14 @@ export default function Dashboard() {
                   <tbody>
                     {d.pending_company.map((r, i) => (
                       <tr key={i} onClick={() => drill("/company-balance", r.item)}
-                        className="cursor-pointer hover:bg-[#111925] transition-colors duration-150" data-testid={`pending-row-${i}`}>
+                        className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`pending-row-${i}`}>
                         <Td>{r.group || "—"}</Td>
-                        <Td tone="text-[#e8edf5]">{r.item}</Td>
+                        <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
                         <Td>{r.shade || "—"}</Td>
                         <Td right>{N(r.sent_qty)}</Td>
-                        <Td right tone="text-[#7CE28A]">{N(r.arrived_qty)}</Td>
-                        <Td right tone="text-[#FFC44D] font-bold">{N(r.balance_qty)}</Td>
-                        <Td tone="text-[#67778e]">{r.last_date || "—"}</Td>
+                        <Td right tone="text-[color:var(--tone-good)]">{N(r.arrived_qty)}</Td>
+                        <Td right tone="text-[color:var(--tone-warn)] font-bold">{N(r.balance_qty)}</Td>
+                        <Td tone="text-[color:var(--dash-dim)]">{r.last_date || "—"}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -244,13 +244,13 @@ export default function Dashboard() {
                   <tbody>
                     {d.shortfalls.map((r, i) => (
                       <tr key={i} onClick={() => drill("/company-order", r.item)}
-                        className="cursor-pointer hover:bg-[#111925] transition-colors duration-150" data-testid={`shortfall-row-${i}`}>
+                        className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`shortfall-row-${i}`}>
                         <Td>{r.group || "—"}</Td>
-                        <Td tone="text-[#e8edf5]">{r.item}</Td>
+                        <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
                         <Td>{r.shade || "—"}</Td>
                         <Td right>{N(r.ordered_qty)}</Td>
                         <Td right>{N(r.stock_qty)}</Td>
-                        <Td right tone="text-[#FF6B6B] font-bold">{N(r.to_order)}</Td>
+                        <Td right tone="text-[color:var(--tone-bad)] font-bold">{N(r.to_order)}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -279,21 +279,21 @@ export default function Dashboard() {
                   <tbody>
                     {d.party_wise.map((p, i) => (
                       <tr key={i} onClick={() => setF((prev) => ({ ...prev, party: p.party }))}
-                        className="cursor-pointer hover:bg-[#111925] transition-colors duration-150" data-testid={`party-row-${i}`}>
-                        <Td mono={false} tone="text-[#e8edf5] font-medium">{p.party}</Td>
+                        className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`party-row-${i}`}>
+                        <Td mono={false} tone="text-[color:var(--dash-text)] font-medium">{p.party}</Td>
                         <Td right>{N(p.rows)}</Td>
                         <Td right>{N(p.items)}</Td>
-                        <Td right tone="text-[#63A9FF] font-bold">{N(p.qty)}</Td>
+                        <Td right tone="text-[color:var(--tone-accent)] font-bold">{N(p.qty)}</Td>
                         <Td right>{money(p.amount)}</Td>
-                        <Td right tone="text-[#7CE28A]">{N(p.ready)}</Td>
-                        <Td right tone={p.pending ? "text-[#FFC44D]" : "text-[#5b6b81]"}>{N(p.pending)}</Td>
+                        <Td right tone="text-[color:var(--tone-good)]">{N(p.ready)}</Td>
+                        <Td right tone={p.pending ? "text-[color:var(--tone-warn)]" : "text-[color:var(--dash-dim)]"}>{N(p.pending)}</Td>
                         <Td right>{N(p.billed)}</Td>
                         <Td>
                           <div className="flex items-center gap-2 min-w-[120px]">
-                            <div className="h-1.5 w-20 bg-[#1a2432]">
-                              <div className="h-full bg-[#7CE28A] transition-all duration-500" style={{ width: `${p.ready_pct}%` }} />
+                            <div className="h-1.5 w-20 bg-[color:var(--dash-line)]">
+                              <div className="h-full bg-[color:var(--tone-good)] transition-all duration-500" style={{ width: `${p.ready_pct}%` }} />
                             </div>
-                            <span className="text-[10px] mono text-[#7d8ea6]">{p.ready_pct}%</span>
+                            <span className="text-[10px] mono text-[color:var(--dash-dim)]">{p.ready_pct}%</span>
                           </div>
                         </Td>
                       </tr>
@@ -315,10 +315,10 @@ export default function Dashboard() {
                   <tbody>
                     {d.item_wise.map((r, i) => (
                       <tr key={i} onClick={() => setF((prev) => ({ ...prev, item: r.item }))}
-                        className="cursor-pointer hover:bg-[#111925] transition-colors duration-150" data-testid={`item-row-${i}`}>
-                        <Td tone="text-[#e8edf5]">{r.item}</Td>
+                        className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`item-row-${i}`}>
+                        <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
                         <Td>{r.group || "—"}</Td>
-                        <Td right tone="text-[#63A9FF] font-bold">{N(r.qty)}</Td>
+                        <Td right tone="text-[color:var(--tone-accent)] font-bold">{N(r.qty)}</Td>
                         <Td right>{N(r.rows)}</Td>
                         <Td right>{N(r.parties)}</Td>
                       </tr>

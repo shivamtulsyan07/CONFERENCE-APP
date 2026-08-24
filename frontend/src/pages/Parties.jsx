@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, errMsg } from "../lib/api";
-import { PageHeader } from "../components/PageHeader";
+import { SheetFrame } from "../components/SheetFrame";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -33,32 +33,32 @@ export default function Parties() {
   };
 
   return (
-    <div>
-      <PageHeader
-        testId="parties-page"
-        title="Party Master"
-        subtitle="Names and page numbers used by the Conference Order dropdowns"
-        action={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button data-testid="add-party-btn">ADD PARTY</Button></DialogTrigger>
-            <DialogContent data-testid="party-dialog">
-              <DialogHeader><DialogTitle>New party</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                {[["name", "Party name"], ["page", "Page"], ["phone", "Phone"], ["city", "City"]].map(([k, label]) => (
-                  <div key={k} className="space-y-1.5">
-                    <Label htmlFor={k}>{label}</Label>
-                    <Input id={k} data-testid={`party-${k}-input`} value={form[k]}
-                      onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
-                  </div>
-                ))}
-              </div>
-              <DialogFooter><Button data-testid="save-party-btn" onClick={save}>SAVE PARTY</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-        }
-      />
-
-      <div className="grid-panel overflow-x-auto" data-testid="parties-table">
+    <SheetFrame
+      testId="parties-page"
+      title="Party Master"
+      subtitle="Names and page numbers used by the Conference Order dropdowns"
+      actions={
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="h-8 text-[10px]" data-testid="add-party-btn">ADD PARTY</Button>
+          </DialogTrigger>
+          <DialogContent data-testid="party-dialog">
+            <DialogHeader><DialogTitle>New party</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              {[["name", "Party name"], ["page", "Page"], ["phone", "Phone"], ["city", "City"]].map(([k, label]) => (
+                <div key={k} className="space-y-1.5">
+                  <Label htmlFor={k}>{label}</Label>
+                  <Input id={k} data-testid={`party-${k}-input`} value={form[k]}
+                    onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+                </div>
+              ))}
+            </div>
+            <DialogFooter><Button data-testid="save-party-btn" onClick={save}>SAVE PARTY</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+      }
+    >
+      <div className="sheet-scroll" data-testid="parties-table">
         <Table>
           <TableHeader>
             <TableRow>
@@ -92,6 +92,6 @@ export default function Parties() {
           </TableBody>
         </Table>
       </div>
-    </div>
+    </SheetFrame>
   );
 }

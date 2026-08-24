@@ -36,7 +36,7 @@ export const FilterPopover = ({
           className={`w-full flex items-center justify-between gap-1 h-7 px-2 rounded-sm border text-[11px] transition-colors duration-150 ${
             active
               ? "bg-[#0066FF] text-white border-[#0066FF]"
-              : "bg-white text-muted-foreground border-border hover:border-[#0066FF]"
+              : "bg-[color:var(--sheet-bg)] text-muted-foreground border-border hover:border-[#0066FF]"
           }`}
         >
           <span className="truncate uppercase">
@@ -87,7 +87,7 @@ export const FilterPopover = ({
             data-testid={`${prefix}filter-op-${column.key}`}
             value={f.op}
             onChange={(e) => onChange({ ...f, op: e.target.value })}
-            className="w-full h-8 px-2 text-xs border border-border rounded-sm bg-white"
+            className="w-full h-8 px-2 text-xs border border-border rounded-sm bg-[color:var(--sheet-bg)]"
           >
             {ops.map((o) => (
               <option key={o.id} value={o.id}>{o.label}</option>

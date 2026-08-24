@@ -49,6 +49,74 @@ h1, h2, h3, h4, .font-display {
         --chart-4: 209 74% 15%;
         --chart-5: 4 78% 55%;
         --radius: 0.5rem;
+
+        /* shell + sheet surfaces (light) */
+        --shell-bg: 210 20% 95%;
+        --shell-panel: 0 0% 100%;
+        --shell-line: 214 28% 88%;
+        --shell-text: 222 47% 11%;
+        --shell-dim: 215 16% 45%;
+        --shell-active: 217 100% 50%;
+        --shell-soft: #e4eefe;
+        --dash-bg: #f4f6fa;
+        --dash-panel: #ffffff;
+        --dash-head: #f8fafc;
+        --dash-line: #dbe2ec;
+        --dash-hover: #eef3fa;
+        --dash-text: #0a2540;
+        --dash-dim: #64748b;
+        --tone-accent: #0057d9;
+        --tone-good: #2e7d4f;
+        --tone-warn: #b26a00;
+        --tone-bad: #c0392b;
+        --sheet-bg: #ffffff;
+        --sheet-alt: #f7f9fc;
+        --sheet-border: #c9d3e0;
+        --sheet-head2: #eef2f7;
+        --sheet-text: #0a2540;
+    }
+
+    .dark {
+        --background: 216 44% 6%;
+        --foreground: 213 33% 93%;
+        --card: 214 36% 9%;
+        --card-foreground: 213 33% 93%;
+        --popover: 214 36% 9%;
+        --popover-foreground: 213 33% 93%;
+        --primary: 213 100% 69%;
+        --primary-foreground: 216 60% 8%;
+        --secondary: 214 36% 11%;
+        --secondary-foreground: 213 33% 93%;
+        --muted: 214 30% 13%;
+        --muted-foreground: 214 15% 60%;
+        --accent: 213 100% 69%;
+        --accent-foreground: 216 60% 8%;
+        --border: 213 27% 18%;
+        --input: 213 27% 18%;
+        --ring: 213 100% 69%;
+        --sheet-bg: #0d131c;
+        --sheet-alt: #0b1017;
+        --sheet-border: #1e2836;
+        --sheet-head2: #101825;
+        --sheet-text: #e8edf5;
+        --shell-bg: 216 44% 6%;
+        --shell-panel: 214 36% 9%;
+        --shell-line: 213 27% 16%;
+        --shell-text: 213 33% 93%;
+        --shell-dim: 214 15% 55%;
+        --shell-active: 213 100% 69%;
+        --shell-soft: #16263c;
+        --dash-bg: #070b11;
+        --dash-panel: #0b1017;
+        --dash-head: #0d131c;
+        --dash-line: #1e2836;
+        --dash-hover: #111925;
+        --dash-text: #e8edf5;
+        --dash-dim: #67778e;
+        --tone-accent: #63a9ff;
+        --tone-good: #7ce28a;
+        --tone-warn: #ffc44d;
+        --tone-bad: #ff6b6b;
     }
 }
 

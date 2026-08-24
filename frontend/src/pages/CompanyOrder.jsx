@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useGridFilter } from "../lib/useGridFilter";
 import { FilterPopover } from "../components/FilterPopover";
+import { SheetFrame, StatStrip } from "../components/SheetFrame";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { toast } from "sonner";
@@ -43,60 +44,50 @@ export default function CompanyOrder() {
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>;
 
   return (
-    <div data-testid="company-order-page">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Company Order</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            What must be ordered from the company to fulfil every conference order (ordered qty − in house stock)
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 uppercase items-center">
+    <SheetFrame
+      testId="company-order-page"
+      title="Company Order"
+      subtitle="What must be ordered from the company (ordered qty − in house stock)"
+      actions={
+        <>
           <Input
             data-testid="company-global-search"
             value={grid.search}
             onChange={(e) => grid.setSearch(e.target.value)}
             placeholder="SEARCH ANY COLUMN"
-            className="h-9 w-52 text-xs"
+            className="h-8 w-44 text-xs"
           />
           {grid.activeCount > 0 && (
-            <Button variant="outline" data-testid="company-clear-filters-btn" onClick={grid.clearAll}>
-              <FilterX className="h-4 w-4 mr-1" /> CLEAR FILTERS ({grid.activeCount})
+            <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="company-clear-filters-btn" onClick={grid.clearAll}>
+              <FilterX className="h-3.5 w-3.5 mr-1" /> CLEAR ({grid.activeCount})
             </Button>
           )}
-          <Button
-            variant={pendingOnly ? "default" : "outline"}
-            data-testid="pending-only-btn"
-            onClick={() => setPendingOnly((p) => !p)}
-          >
-            {pendingOnly ? "SHOWING SHORTAGE ONLY" : "SHOWING ALL ITEMS"}
+          <Button variant={pendingOnly ? "default" : "outline"} size="sm" className="h-8 text-[10px]" data-testid="pending-only-btn" onClick={() => setPendingOnly((p) => !p)}>
+            {pendingOnly ? "SHORTAGE ONLY" : "ALL ITEMS"}
           </Button>
-          <Button variant="outline" data-testid="export-excel-btn" onClick={() => download("xlsx")}>
-            <FileSpreadsheet className="h-4 w-4 mr-1" /> EXPORT EXCEL
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="export-excel-btn" onClick={() => download("xlsx")}>
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> EXCEL
           </Button>
-          <Button variant="outline" data-testid="export-pdf-btn" onClick={() => download("pdf")}>
-            <FileText className="h-4 w-4 mr-1" /> EXPORT PDF
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="export-pdf-btn" onClick={() => download("pdf")}>
+            <FileText className="h-3.5 w-3.5 mr-1" /> PDF
           </Button>
-          <Button variant="outline" data-testid="refresh-company-btn" onClick={() => load()}>
-            <RefreshCw className="h-4 w-4 mr-1" /> REFRESH
+          <Button variant="outline" size="sm" className="h-8 text-[10px]" data-testid="refresh-company-btn" onClick={() => load()}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> REFRESH
           </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        {[
-          ["Lines to order", data.total_lines, "stat-lines"],
-          ["Total ordered qty", data.total_ordered, "stat-ordered"],
-          ["Total qty to order", data.total_to_order, "stat-to-order"],
-        ].map(([label, value, tid]) => (
-          <div key={tid} className="grid-panel stat-panel p-4" data-testid={tid}>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-            <div className="mt-2 text-2xl font-black mono">{value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid-panel overflow-auto max-h-[65vh]" data-testid="company-grid">
+        </>
+      }
+      stats={
+        <StatStrip
+          items={[
+            ["Lines to order", data.total_lines, "stat-lines"],
+            ["Total ordered qty", data.total_ordered, "stat-ordered"],
+            ["Total qty to order", data.total_to_order, "stat-to-order"],
+            ["In house stock", data.total_stock, "stat-stock"],
+          ]}
+        />
+      }
+    >
+      <div className="sheet-scroll" data-testid="company-grid">
         <table className="border-collapse w-max min-w-full">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[#0A2540] text-white">
@@ -114,10 +105,10 @@ export default function CompanyOrder() {
                 </th>
               ))}
             </tr>
-            <tr className="bg-[#eef2f7]">
+            <tr className="bg-[color:var(--sheet-head2)]">
               <th />
               {columns.map((c) => (
-                <th key={c.key} className="border-r border-b border-[#c9d3e0] p-1">
+                <th key={c.key} className="border-r border-b border-[color:var(--sheet-border)] p-1">
                   <FilterPopover
                     column={c}
                     filter={grid.filters[c.key]}
@@ -142,16 +133,16 @@ export default function CompanyOrder() {
             {grid.visible.map((r, i) => (
               <tr
                 key={`${r.group}-${r.item}-${r.shade}`}
-                className="row-hover bg-white"
+                className="row-hover bg-[color:var(--sheet-bg)]"
                 data-testid={`company-row-${i}`}
               >
-                <td className="border-r border-b border-[#c9d3e0] text-center text-[10px] text-muted-foreground h-8">
+                <td className="border-r border-b border-[color:var(--sheet-border)] text-center text-[10px] text-muted-foreground h-8">
                   {i + 1}
                 </td>
                 {columns.map((c) => (
                   <td
                     key={c.key}
-                    className={`border-r border-b border-[#c9d3e0] px-2 text-sm mono ${
+                    className={`border-r border-b border-[color:var(--sheet-border)] px-2 text-sm mono ${
                       c.numeric ? "text-right" : ""
                     } ${c.key === "to_order" && r.to_order > 0 ? "font-bold text-[#0066FF]" : ""}`}
                     data-testid={`company-cell-${i}-${c.key}`}
@@ -173,6 +164,6 @@ export default function CompanyOrder() {
           </tfoot>
         </table>
       </div>
-    </div>
+    </SheetFrame>
   );
 }
