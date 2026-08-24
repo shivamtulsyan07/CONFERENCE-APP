@@ -17,8 +17,8 @@ Module to take orders from customers, order from the company, and dispatch party
 - Pages: Dashboard, Order Sheet (/orders), Stock Entry (/stock), Party Master (/parties).
 
 ## Implemented
-- Order Sheet columns (as of latest request): SR, Party Name, Page No., Conference Name, Item, Shade, Qty, MTR, Bill Number, Rate. Amount is auto-computed (qty × rate) for footer/dashboard totals but not a visible column.
-- Stock Entry columns: Conference Name, Item Name, Shade, Quantity.
+- Order Sheet columns (as of latest request): SR, Party Name, Page No., Conference Name, Group Name, Item, Shade, Qty, MTR, Bill Number, Rate. Amount is auto-computed (qty × rate) for footer/dashboard totals but not a visible column.
+- Stock Entry columns: Conference Name, Group Name, Item Name, Shade, Quantity.
 - 2026-06 v1: form-based orders → company PO → receive → party-wise dispatch with auto stock deduction (now replaced).
 - 2026-06 v2: Excel-like Order Sheet and Stock Entry sheets, colour statuses (click row number to cycle), "Auto colour from stock" matching Item+Shade against stock, footer totals, per-column filters, party→page auto-fill, Excel paste, dashboard rebuilt on sheet data (qty, value, billed/unbilled, readiness counts, party-wise stacked chart, top items).
 

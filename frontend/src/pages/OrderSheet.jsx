@@ -8,25 +8,26 @@ import { toast } from "sonner";
 import { Save, Trash2, Wand2, Filter } from "lucide-react";
 
 export default function OrderSheet() {
-  const [lookups, setLookups] = useState({ parties: [], conferences: [], items: [], shades: [], bill_nos: [], party_pages: {} });
+  const [lookups, setLookups] = useState({ parties: [], conferences: [], groups: [], items: [], shades: [], bill_nos: [], party_pages: {} });
   const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
   const columns = [
-    { key: "party_name", label: "Party Name", width: 260, options: lookups.parties, upper: true },
+    { key: "party_name", label: "Party Name", width: 250, options: lookups.parties, upper: true },
     { key: "page", label: "Page No.", width: 80, numeric: true },
-    { key: "conference", label: "Conference Name", width: 170, options: lookups.conferences, upper: true },
-    { key: "item", label: "Item", width: 190, options: lookups.items, upper: true },
+    { key: "conference", label: "Conference Name", width: 160, options: lookups.conferences, upper: true },
+    { key: "group", label: "Group Name", width: 130, options: lookups.groups, upper: true },
+    { key: "item", label: "Item", width: 180, options: lookups.items, upper: true },
     { key: "shade", label: "Shade", width: 90 },
     { key: "qty", label: "Qty", width: 70, numeric: true },
-    { key: "mtr", label: "MTR", width: 110 },
-    { key: "bill_no", label: "Bill Number", width: 120, options: lookups.bill_nos, upper: true },
+    { key: "mtr", label: "MTR", width: 105 },
+    { key: "bill_no", label: "Bill Number", width: 115, options: lookups.bill_nos, upper: true },
     { key: "rate", label: "Rate", width: 90, numeric: true },
   ];
 
   const blankRow = {
-    party_name: "", page: "", conference: "SH ROLL", item: "", shade: "",
+    party_name: "", page: "", conference: "", group: "SH ROLL", item: "", shade: "",
     qty: "", mtr: "", bill_no: "", rate: "", amount: "", status: "not_ready",
   };
 
@@ -187,7 +188,7 @@ export default function OrderSheet() {
           <tfoot className="sticky bottom-0">
             <tr className="bg-[#0A2540] text-white">
               <td className="px-2 py-2 text-xs">Σ</td>
-              <td colSpan={4} className="px-2 py-2 text-xs">{sheet.filtered.length} rows shown</td>
+              <td colSpan={5} className="px-2 py-2 text-xs">{sheet.filtered.length} rows shown</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="total-qty">{totals.qty}</td>
               <td colSpan={2} className="px-2 py-2 text-xs text-right">Value</td>
               <td className="px-2 py-2 text-xs text-right mono" data-testid="total-amount">{money(totals.amount)}</td>
