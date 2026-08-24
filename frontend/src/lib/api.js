@@ -18,6 +18,7 @@ export const api = {
   deleteStockRow: (id) => http.delete(`/stock-rows/${id}`).then((r) => r.data),
 
   lookups: () => http.get("/lookups").then((r) => r.data),
+  balanceStock: () => http.get("/balance-stock").then((r) => r.data),
   stats: () => http.get("/stats/dashboard").then((r) => r.data),
   seed: () => http.post("/seed").then((r) => r.data),
 };

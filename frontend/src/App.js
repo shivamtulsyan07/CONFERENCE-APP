@@ -6,6 +6,7 @@ import { Shell } from "@/components/Shell";
 import Dashboard from "@/pages/Dashboard";
 import OrderSheet from "@/pages/OrderSheet";
 import StockSheet from "@/pages/StockSheet";
+import BalanceStock from "@/pages/BalanceStock";
 import Parties from "@/pages/Parties";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/orders" element={<OrderSheet />} />
             <Route path="/stock" element={<StockSheet />} />
+            <Route path="/balance" element={<BalanceStock />} />
             <Route path="/parties" element={<Parties />} />
           </Route>
         </Routes>

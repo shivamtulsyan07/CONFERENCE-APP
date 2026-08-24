@@ -267,6 +267,53 @@ async def lookups():
     }
 
 
+# ---------- Balance stock ----------
+@api_router.get("/balance-stock")
+async def balance_stock():
+    stock = await db.stock_rows.find().to_list(5000)
+    orders = await db.order_rows.find().to_list(5000)
+
+    rows = {}
+
+    def entry(item, shade, conference="", group=""):
+        key = (item.strip().upper(), str(shade).strip())
+        e = rows.setdefault(key, {
+            "item": item.strip(), "shade": str(shade).strip(),
+            "conference": conference, "group": group,
+            "stock_qty": 0, "ordered_qty": 0,
+        })
+        if conference and not e["conference"]:
+            e["conference"] = conference
+        if group and not e["group"]:
+            e["group"] = group
+        return e
+
+    for s in stock:
+        if not str(s.get("item", "")).strip():
+            continue
+        e = entry(s.get("item", ""), s.get("shade", ""), s.get("conference", ""), s.get("group", ""))
+        e["stock_qty"] += s.get("quantity") or 0
+
+    for o in orders:
+        if not str(o.get("item", "")).strip():
+            continue
+        e = entry(o.get("item", ""), o.get("shade", ""), o.get("conference", ""), o.get("group", ""))
+        e["ordered_qty"] += o.get("qty") or 0
+
+    out = []
+    for e in rows.values():
+        e["balance"] = e["stock_qty"] - e["ordered_qty"]
+        out.append(e)
+    out.sort(key=lambda x: (x["item"], x["shade"]))
+    return {
+        "rows": out,
+        "total_stock": sum(r["stock_qty"] for r in out),
+        "total_ordered": sum(r["ordered_qty"] for r in out),
+        "total_balance": sum(r["balance"] for r in out),
+        "short_lines": sum(1 for r in out if r["balance"] < 0),
+    }
+
+
 # ---------- Dashboard ----------
 @api_router.get("/stats/dashboard")
 async def dashboard_stats():

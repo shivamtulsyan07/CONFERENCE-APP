@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Table2, Boxes, Users, Menu } from "lucide-react";
+import { LayoutDashboard, Table2, Boxes, Scale, Users, Menu } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "../context/RoleContext";
 import { Button } from "./ui/button";
@@ -8,6 +8,7 @@ const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, id: "dashboard" },
   { to: "/orders", label: "Order Sheet", icon: Table2, id: "orders" },
   { to: "/stock", label: "Stock Entry", icon: Boxes, id: "stock" },
+  { to: "/balance", label: "Balance Stock", icon: Scale, id: "balance" },
   { to: "/parties", label: "Parties", icon: Users, id: "parties" },
 ];
 

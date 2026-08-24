@@ -22,6 +22,8 @@ Module to take orders from customers, order from the company, and dispatch party
 - 2026-06 v1: form-based orders → company PO → receive → party-wise dispatch with auto stock deduction (now replaced).
 - 2026-06 v2: Excel-like Order Sheet and Stock Entry sheets, colour statuses (click row number to cycle), "Auto colour from stock" matching Item+Shade against stock, footer totals, per-column filters, party→page auto-fill, Excel paste, dashboard rebuilt on sheet data (qty, value, billed/unbilled, readiness counts, party-wise stacked chart, top items).
 
+- Balance Stock page (/balance): read-only sheet = stock qty − ordered qty matched on Item+Shade; green surplus, red short, "Short only" toggle, filters, footer totals. Endpoint GET /api/balance-stock.
+
 ## Backlog
 - P1: Bill-wise view / print of a party's sheet; export to Excel/CSV
 - P1: auto-status should net off demand across rows sharing the same Item+Shade
