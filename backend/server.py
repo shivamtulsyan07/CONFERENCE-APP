@@ -463,7 +463,8 @@ async def company_balance():
 
 
 # ---------- Company order (what to order from the company) ----------
-def company_order_rows_sync(orders, stock):
+def company_order_rows_sync(orders, stock, pending=None):
+    pending = pending or {}
     stock_by_key = {}
     for s in stock:
         key = (str(s.get("group", "")).strip().upper(), str(s.get("item", "")).strip().upper(), str(s.get("shade", "")).strip())
@@ -488,7 +489,8 @@ def company_order_rows_sync(orders, stock):
 
     out = []
     for e in agg.values():
-        to_order = e["ordered_qty"] - e["stock_qty"]
+        key = (e["group"].strip().upper(), e["item"].strip().upper(), e["shade"].strip())
+        to_order = e["ordered_qty"] - e["stock_qty"] - pending.get(key, 0)
         out.append({
             "group": e["group"], "item": e["item"], "shade": e["shade"],
             "ordered_qty": e["ordered_qty"], "stock_qty": e["stock_qty"],
@@ -499,10 +501,28 @@ def company_order_rows_sync(orders, stock):
     return out
 
 
+async def pending_company_map():
+    """Qty still awaited from the company (sent − arrived) per Group+Item+Shade."""
+    sent = await db.company_sent_rows.find().to_list(20000)
+    arrived = await db.company_arrived_rows.find().to_list(20000)
+    agg = {}
+    for r in sent:
+        if not str(r.get("item", "")).strip():
+            continue
+        k = (_norm(r.get("group")), _norm(r.get("item")), str(r.get("shade", "")).strip())
+        agg[k] = agg.get(k, 0) + (r.get("quantity") or 0)
+    for r in arrived:
+        if not str(r.get("item", "")).strip():
+            continue
+        k = (_norm(r.get("group")), _norm(r.get("item")), str(r.get("shade", "")).strip())
+        agg[k] = agg.get(k, 0) - (r.get("quantity") or 0)
+    return {k: v for k, v in agg.items() if v > 0}
+
+
 async def get_company_order(pending_only: bool):
     orders = await db.order_rows.find().to_list(20000)
     stock = await db.stock_rows.find().to_list(20000)
-    rows = company_order_rows_sync(orders, stock)
+    rows = company_order_rows_sync(orders, stock, await pending_company_map())
     if pending_only:
         rows = [r for r in rows if r["to_order"] > 0]
     return rows

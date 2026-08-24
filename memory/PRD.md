@@ -49,6 +49,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 Rail regrouped to 3 headings: **Overview** (Dashboard, Parties), **Conference** (Conference Order, Conference Order Summary, Company Order), **Stock** (In House Stock, Company Balance Order, Stock Arrived, Balance Stock). Rail testids are now `rail-overview|conference|stock`. Company Order PDF export drops the ORDERED and IN HOUSE columns (SR / Group / Item / Shade / To order only); the Excel export still has all columns.
 
+- 2026-06 Company Order now nets off the company pipeline: **To Order = conference demand − in house stock − qty still pending with the company (sent − arrived)** via `pending_company_map()`. Applies to `/api/company-order` and both exports only; Balance Stock and the dashboard shortfall tile deliberately keep the old (demand − stock) logic.
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

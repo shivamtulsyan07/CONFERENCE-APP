@@ -47,7 +47,7 @@ export default function CompanyOrder() {
     <SheetFrame
       testId="company-order-page"
       title="Company Order"
-      subtitle="What must be ordered from the company (ordered qty − in house stock)"
+      subtitle="What must be ordered from the company (ordered qty − in house stock − qty already pending with the company)"
       actions={
         <>
           <Input
