@@ -20,6 +20,8 @@ export const LineSheet = ({
   headerColor,
   prefix,
   extraColumns = [],
+  leadColumns = [],
+  omitColumns = [],
   extraValue,
   onSaved,
   toolbarExtras,
@@ -33,21 +35,24 @@ export const LineSheet = ({
   useEffect(() => { api.lookups().then(setLookups); }, []);
 
   const allColumns = useMemo(() => ([
+    ...leadColumns,
     { key: "group", label: "Group Name", width: 150, options: lookups.groups, upper: true },
     { key: "item", label: "Item Name", width: 220, options: lookups.items, upper: true },
     { key: "shade", label: "Shade", width: 100 },
     { key: "quantity", label: "Quantity", width: 110, numeric: true },
     { key: "date", label: "Date", width: 120 },
     { key: "remark", label: "Remark", width: 200 },
-  ]), [lookups]);
+  ].filter((c) => !omitColumns.includes(c.key))), [lookups]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns = allColumns.filter((c) => !hidden.includes(c.key));
-  const blankRow = { group: "SH ROLL", item: "", shade: "", quantity: "", date: "", remark: "" };
+  const blankRow = { group: "SH ROLL", item: "", shade: "", quantity: "", date: "", remark: "", party_name: "", bill_no: "" };
 
   const blankZeros = (rows) => rows.map((r) => ({ ...r, quantity: r.quantity || "" }));
   const normalize = (r) => ({
     id: r.id || null,
     row_index: r.row_index ?? 0,
+    party_name: r.party_name || "",
+    bill_no: String(r.bill_no ?? ""),
     group: r.group || "",
     item: r.item || "",
     shade: String(r.shade ?? ""),

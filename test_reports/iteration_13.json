@@ -1,0 +1,65 @@
+{
+  "summary": "Iteration 13 - Verified new Shop Sale module (/shop-sale) end-to-end. Backend: 56/56 pytest passing (added 12 new tests in test_shop_sale.py). Frontend: rail-shop opens /shop-sale with tab-shop-sale active, column order matches spec (SR, Party Name, Bill No, Group Name, Item Name, Shade, Quantity, Del - no Date/Remark), typing autosaves and persists after reload, partial row with ONLY Party Name + Bill No (no item/qty) persists and is NOT treated as blank, stat strip updates (ss-stat-lines / ss-stat-qty / ss-stat-bills), party dropdown populated from party master (3 entries). Regression: /company-balance (cb-grid) and /stock-arrived (sa-grid) still expose Group/Item/Shade/Quantity/Date/Remark headers. Shop Sale writes do not affect dashboard or company-balance (verified by API).",
+  "backend_pytest": {
+    "command": "pytest backend/tests/test_shop_sale.py backend/tests/test_line_sheets.py backend/tests/backend_test.py -o addopts=\"\" -q",
+    "result": "56 passed in 113.47s",
+    "junit": "/app/test_reports/pytest/iter13_backend.xml",
+    "new_tests_added": [
+      "TestShopSaleCRUD.test_list_ok_and_shape",
+      "TestShopSaleCRUD.test_unknown_sheet_still_404s",
+      "TestShopSaleCRUD.test_bulk_create_party_bill_roundtrip",
+      "TestShopSaleCRUD.test_partial_row_party_and_bill_only_persists",
+      "TestShopSaleCRUD.test_only_party_persists",
+      "TestShopSaleCRUD.test_fully_blank_row_skipped",
+      "TestShopSaleCRUD.test_blank_with_id_deletes",
+      "TestShopSaleCRUD.test_update_by_id",
+      "TestShopSaleCRUD.test_replace_wipes_and_reinserts",
+      "TestShopSaleCRUD.test_delete_by_id",
+      "TestNoRegressionOnOtherLineSheets.test_company_sent_still_accepts_and_lists_with_party_bill",
+      "TestNoRegressionOnOtherLineSheets.test_company_balance_ignores_shop_sale",
+      "TestNoRegressionOnOtherLineSheets.test_dashboard_unaffected_by_shop_sale"
+    ]
+  },
+  "frontend_ui_checks": {
+    "rail_shop_navigates_to_shop_sale": true,
+    "tab_shop_sale_active": true,
+    "columns_order": ["SR","Party Name","Bill No","Group Name","Item Name","Shade","Quantity","Del"],
+    "date_or_remark_present": false,
+    "autosave_saved_indicator": true,
+    "partial_row_party_bill_persists_after_reload": true,
+    "full_row_persists_after_reload": true,
+    "stats_after_partial_row": {"ss-stat-lines": 1, "ss-stat-qty": 0, "ss-stat-bills": 1},
+    "stats_after_full_row_added": {"ss-stat-lines": 2, "ss-stat-qty": 5, "ss-stat-bills": 2},
+    "party_dropdown_source": "populated from Party master (dl-party_name had 3 options: CHAUDHARY VASTRALAYA, DARDHA; SRI RAM VASTRALAYA, BHELAHI; TRILOK VASTRALAYA, LAKHORA)",
+    "console_errors": 0
+  },
+  "regression_checks": {
+    "/company-balance headers": ["SR","Group Name","Item Name","Shade","Quantity","Date","Remark","Arrived","Balance","Del"],
+    "/stock-arrived headers": ["SR","Group Name","Item Name","Shade","Quantity","Date","Remark","Del"],
+    "shop_sale_does_not_affect_company_balance": "verified via test_company_balance_ignores_shop_sale",
+    "shop_sale_does_not_affect_dashboard": "verified via test_dashboard_unaffected_by_shop_sale",
+    "unknown_line_sheet_still_404s": "verified"
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_shop_sale.py",
+    "/app/test_reports/pytest/iter13_backend.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LineRow / LineRowIn now carry party_name + bill_no on every line-sheet collection (company_sent_rows / company_arrived_rows also expose these keys even though the CB/SA UI omits them via omitColumns). That's fine functionally, but it means an API caller of /line-sheet/company-sent-rows can now set party_name/bill_no with no server validation - consider per-sheet Pydantic guards if that ever matters.",
+    "is_blank_line correctly treats a row as non-blank when only party_name or bill_no is filled - good, matches the spec. Shared with company-sent/arrived means those sheets will now also keep rows with just party_name/bill_no even though their UI hides those columns; verify E1 is OK with this shared behaviour.",
+    "ShopSale.jsx refreshTotals uses api.lineRows and filters on item OR party_name (line 18). Consistent with is_blank_line (party_name+bill_no non-blank), so a bill-only row (no party) is currently NOT counted in ss-stat-lines because the filter requires item OR party_name. Not required by spec but worth aligning with the persistence rule.",
+    "LineSheet.jsx line 48 blankRow does NOT default group to '' when omitColumns includes group - Shop Sale still defaults to 'SH ROLL' in blankRow. Since group is not omitted, empty rows show 'SH ROLL' in Group Name (visible in screenshot). E1 may want blankRow.group = '' for Shop Sale to avoid confusing default text on empty rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_shop_sale.py (new)"
+  ],
+  "success_rate": {"backend": "100% (56/56)", "frontend": "100% (all Shop Sale + regression flows pass)"},
+  "seed_data_creation": "None persisted. Two QA_UI rows were briefly created in shop_sale_rows during UI testing and were deleted via the /line-sheet DELETE endpoint at the end. All autouse fixtures also purge QA_-prefixed rows before/after each backend test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Shop Sale testids: ss-grid, ss-row-N, ss-cell-<row>-<col>, ss-stat-lines / ss-stat-qty / ss-stat-bills, ss-delete-row-N, ss-global-search, ss-toggle-filters-btn. Collection: shop_sale_rows. Route: /shop-sale (Shell rail-shop -> /shop-sale, top tab tab-shop-sale). is_blank_line now includes party_name/bill_no so rows with only party+bill persist. Backend pytest MUST use -o addopts=\"\" to disable xdist. New test file /app/backend/tests/test_shop_sale.py (autouse fixture cleans QA_-prefixed rows).",
+  "rca of the issue": "N/A - no bugs found in iteration 13."
+}

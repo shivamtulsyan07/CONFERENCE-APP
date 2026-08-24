@@ -126,6 +126,8 @@ class StockRowIn(BaseModel):
 
 
 class LineRow(BaseDocument):
+    party_name: str = ""
+    bill_no: str = ""
     group: str = ""
     item: str = ""
     shade: str = ""
@@ -138,6 +140,8 @@ class LineRow(BaseDocument):
 
 class LineRowIn(BaseModel):
     id: Optional[str] = None
+    party_name: str = ""
+    bill_no: str = ""
     group: str = ""
     item: str = ""
     shade: str = ""
@@ -152,7 +156,8 @@ class BulkLineRows(BaseModel):
 
 
 def is_blank_line(r: LineRowIn):
-    return not any([r.item.strip(), r.shade.strip(), r.quantity, r.remark.strip()])
+    return not any([r.item.strip(), r.shade.strip(), r.quantity, r.remark.strip(),
+                    r.party_name.strip(), r.bill_no.strip()])
 
 
 class BulkOrderRows(BaseModel):
@@ -378,6 +383,7 @@ async def lookups():
 LINE_COLLECTIONS = {
     "company-sent-rows": "company_sent_rows",
     "company-arrived-rows": "company_arrived_rows",
+    "shop-sale-rows": "shop_sale_rows",
 }
 
 
@@ -1082,6 +1088,7 @@ async def ensure_indexes():
     await db.stock_rows.create_index([("row_index", 1)])
     await db.company_sent_rows.create_index([("row_index", 1)])
     await db.company_arrived_rows.create_index([("row_index", 1)])
+    await db.shop_sale_rows.create_index([("row_index", 1)])
     await db.assistant_messages.create_index([("session_id", 1), ("created_at", 1)])
 
 

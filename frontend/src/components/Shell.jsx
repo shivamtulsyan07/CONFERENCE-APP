@@ -39,13 +39,13 @@ export const SECTIONS = [
     id: "shop",
     label: "Shop",
     icon: Store,
-    tabs: [{ to: "/shop", label: "Shop", id: "shop" }],
+    tabs: [{ to: "/shop-sale", label: "Shop Sale", id: "shop-sale" }],
   },
 ];
 
 const TAB_ICON = {
   dashboard: LayoutDashboard, orders: Table2, stock: Boxes, summary: ListTree, balance: Scale,
-  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users, shop: Store,
+  "company-order": Factory, "company-balance": ClipboardList, "stock-arrived": PackageCheck, parties: Users, shop: Store, "shop-sale": Store,
 };
 
 export const Shell = () => {
