@@ -579,15 +579,11 @@ async def company_order_pdf(pending_only: bool = True):
         Paragraph(f"Generated {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M UTC')}", styles["Normal"]),
         Spacer(1, 6 * mm),
     ]
-    data = [["SR", "GROUP NAME", "ITEM NAME", "SHADE", "ORDERED", "IN HOUSE", "TO ORDER"]]
+    data = [["SR", "GROUP NAME", "ITEM NAME", "SHADE", "TO ORDER"]]
     for i, r in enumerate(rows, start=1):
-        data.append([str(i), r["group"], r["item"], r["shade"],
-                     f'{r["ordered_qty"]:g}', f'{r["stock_qty"]:g}', f'{r["to_order"]:g}'])
-    data.append(["", "", "", "TOTAL",
-                 f'{sum(r["ordered_qty"] for r in rows):g}',
-                 f'{sum(r["stock_qty"] for r in rows):g}',
-                 f'{sum(r["to_order"] for r in rows):g}'])
-    table = Table(data, repeatRows=1, colWidths=[12 * mm, 38 * mm, 58 * mm, 20 * mm, 20 * mm, 22 * mm, 22 * mm])
+        data.append([str(i), r["group"], r["item"], r["shade"], f'{r["to_order"]:g}'])
+    data.append(["", "", "", "TOTAL", f'{sum(r["to_order"] for r in rows):g}'])
+    table = Table(data, repeatRows=1, colWidths=[12 * mm, 42 * mm, 68 * mm, 30 * mm, 34 * mm])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A2540")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
