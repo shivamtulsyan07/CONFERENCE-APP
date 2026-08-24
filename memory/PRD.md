@@ -59,6 +59,8 @@ Module to take orders from customers, order from the company, and dispatch party
 
 - 2026-06 Balance Stock formula updated at user request: **balance = in house stock + qty pending with the company (sent − arrived) − conference order** (`/api/balance-stock` now uses `pending_company_map()`); no new column, only the number changed. Company Order keeps its own logic (demand − stock − pending).
 
+- 2026-06 Balance Stock also subtracts **Shop Sales** (`shop_sale_rows`, matched on Group+Item+Shade; each row now carries `shop_sold_qty`). Final formula: stock + pending with company − conference order − shop sales.
+
 ## Backlog
 - Autosave (900ms debounce) + Cmd/Ctrl+Z undo, Cmd/Ctrl+R (and Cmd+Shift+Z) redo, Cmd+S force save. Undo/redo use POST /api/{order,stock}-rows/replace which rewrites the collection to match the snapshot exactly.
 - Conference Name removed from In House Order and Balance Stock (Group Name kept).

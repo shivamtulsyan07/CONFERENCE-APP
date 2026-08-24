@@ -715,8 +715,16 @@ async def balance_stock():
 
     out = []
     pending = await pending_company_map()
+    shop_sales = await db.shop_sale_rows.find().to_list(20000)
+    sold = {}
+    for r in shop_sales:
+        if not str(r.get("item", "")).strip():
+            continue
+        k = (_norm(r.get("group")), _norm(r.get("item")), str(r.get("shade", "")).strip())
+        sold[k] = sold.get(k, 0) + (r.get("quantity") or 0)
     for key, e in rows.items():
-        e["balance"] = e["stock_qty"] + pending.get(key, 0) - e["ordered_qty"]
+        e["shop_sold_qty"] = sold.get(key, 0)
+        e["balance"] = e["stock_qty"] + pending.get(key, 0) - e["ordered_qty"] - e["shop_sold_qty"]
         out.append(e)
     out.sort(key=lambda x: (x["group"], x["item"], x["shade"]))
     return {
