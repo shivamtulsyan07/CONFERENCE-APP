@@ -1,0 +1,71 @@
+{
+  "summary": "Iteration 16 - Regression verification after hook-dependency + list-key cleanup on Dashboard, HaanaAssistant, ShopSale. Both backend and frontend green. Explicitly verified NO render loop on Dashboard: idle /api/stats/overview delta = 0 over 3s wait; each filter change triggers exactly 1 call. No duplicate-key warnings, no console errors, no pageerrors across the entire regression sweep.",
+  "backend": {
+    "pytest": "91 passed in 53.66s (single-threaded, -o addopts='')",
+    "junit": "/app/test_reports/pytest/iter16.xml"
+  },
+  "dashboard_render_loop_check": {
+    "initial_overview_calls_after_load": 2,
+    "delta_during_3s_idle": 0,
+    "filter_conference_calls": 1,
+    "filter_group_calls": 1,
+    "filter_party_calls": 1,
+    "filter_item_calls": 1,
+    "clear_filters_calls": 1,
+    "refresh_calls": 1,
+    "verdict": "PASS - no infinite loop, effect fires once per filter change as intended"
+  },
+  "list_keys_check": {
+    "pending_rows": 0,
+    "shortfall_rows": 455,
+    "party_rows": 54,
+    "item_rows": 243,
+    "duplicate_key_warnings": 0,
+    "verdict": "PASS - stable composite keys render correctly"
+  },
+  "haana_check": {
+    "chip_click_llm_calls": 1,
+    "bubbles_rendered": 2,
+    "duplicate_key_warnings": 0,
+    "verdict": "PASS - message ids and chip text keys work; single LLM call as requested"
+  },
+  "shop_sale_check": {
+    "initial_shop_sale_rows_GETs": 4,
+    "delta_during_4s_idle": 0,
+    "stats_tiles_present": ["ss-stat-lines", "ss-stat-qty", "ss-stat-bills"],
+    "verdict": "PASS - refreshTotals runs once on mount, no repeated polling"
+  },
+  "regression_smoke": {
+    "orders": "loaded (order-grid visible)",
+    "stock": "loaded (page rendered; st-grid selector not present but page shell fine)",
+    "company-balance": "loaded",
+    "stock-arrived": "loaded (sa-grid visible)",
+    "company-order": "loaded",
+    "summary": "loaded",
+    "balance": "loaded",
+    "extra-stock": "loaded",
+    "parties": "loaded"
+  },
+  "totals": {
+    "pageerrors": 0,
+    "console_errors": 0,
+    "duplicate_key_warnings": 0
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/", "/app/test_reports/pytest/iter16.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Dashboard.jsx line 98: useEffect depends on both `f` and `load`; load is stable (empty-deps useCallback) so effect fires only when f changes. Passing f directly to load(f) is correct - the fRef is a safety net for load() called without args (refresh/seed). Clean.",
+    "Dashboard.jsx `seed()` calls `load()` without args and relies on fRef.current - works but could be `load(f)` for clarity/consistency.",
+    "HaanaAssistant.jsx: nextId ref counter is fine, but note that history fetch (line 33) synthesises ids as `h${i}` while live messages use `u${n}`/`a${n}` - no collision risk today but keep the two id namespaces distinct if the hydration ever mixes.",
+    "ShopSale.jsx refreshTotals fetches the entire sheet (api.lineRows) just to compute 3 counters - not new to this iteration but worth noting: consider a lightweight /stats/shop-sale endpoint if the sheet grows."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (91/91)", "frontend": "100% (all targeted checks pass)"},
+  "seed_data_creation": "None - read-only regression run. No writes to any sheet.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Dashboard uses useCallback(load, []) + fRef pattern; effect deps are [f, load]. To detect render loops, count /api/stats/overview requests during a 3s idle window - should be 0. HaanaAssistant now keys messages by internal id (u#/a#/h#) and chips by chip text. ShopSale refreshTotals is useCallback([]) with effect deps [refreshTotals] - single call on mount, and one call after each onSaved from LineSheet.",
+  "rca of the issue": "N/A - no regressions."
+}

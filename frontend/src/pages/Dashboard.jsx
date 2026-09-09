@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, money, errMsg } from "../lib/api";
 import { Button } from "../components/ui/button";
@@ -82,18 +82,20 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [full, setFull] = useState(false);
   const [f, setF] = useState({ conference: "", group: "", party: "", item: "" });
+  const fRef = useRef(f);
+  fRef.current = f;
   const wrapRef = useRef(null);
   const navigate = useNavigate();
 
-  const load = (filters = f) => {
+  const load = useCallback((filters) => {
     setLoading(true);
     return api
-      .overview(filters)
+      .overview(filters ?? fRef.current)
       .then(setD)
       .catch((e) => toast.error(errMsg(e)))
       .finally(() => setLoading(false));
-  };
-  useEffect(() => { load(f); }, [f.conference, f.group, f.party, f.item]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => { load(f); }, [f, load]);
 
   useEffect(() => {
     const onChange = () => setFull(Boolean(document.fullscreenElement));
@@ -118,7 +120,7 @@ export default function Dashboard() {
   const seed = async () => {
     const r = await api.seed();
     toast[r.seeded ? "success" : "info"](r.seeded ? "Sample sheet loaded" : r.message);
-    load();
+    load(f);
   };
 
   // drill down: open the target sheet pre-searched with the most specific active filter
@@ -216,7 +218,7 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {d.pending_company.map((r, i) => (
-                      <tr key={i} onClick={() => drill("/company-balance", r.item)}
+                      <tr key={`${r.group}-${r.item}-${r.shade}`} onClick={() => drill("/company-balance", r.item)}
                         className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`pending-row-${i}`}>
                         <Td>{r.group || "—"}</Td>
                         <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
@@ -243,7 +245,7 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {d.shortfalls.map((r, i) => (
-                      <tr key={i} onClick={() => drill("/company-order", r.item)}
+                      <tr key={`${r.group}-${r.item}-${r.shade}`} onClick={() => drill("/company-order", r.item)}
                         className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`shortfall-row-${i}`}>
                         <Td>{r.group || "—"}</Td>
                         <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
@@ -278,7 +280,7 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {d.party_wise.map((p, i) => (
-                      <tr key={i} onClick={() => setF((prev) => ({ ...prev, party: p.party }))}
+                      <tr key={p.party} onClick={() => setF((prev) => ({ ...prev, party: p.party }))}
                         className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`party-row-${i}`}>
                         <Td mono={false} tone="text-[color:var(--dash-text)] font-medium">{p.party}</Td>
                         <Td right>{N(p.rows)}</Td>
@@ -314,7 +316,7 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {d.item_wise.map((r, i) => (
-                      <tr key={i} onClick={() => setF((prev) => ({ ...prev, item: r.item }))}
+                      <tr key={`${r.group}-${r.item}`} onClick={() => setF((prev) => ({ ...prev, item: r.item }))}
                         className="cursor-pointer hover:bg-[color:var(--dash-hover)] transition-colors duration-150" data-testid={`item-row-${i}`}>
                         <Td tone="text-[color:var(--dash-text)]">{r.item}</Td>
                         <Td>{r.group || "—"}</Td>

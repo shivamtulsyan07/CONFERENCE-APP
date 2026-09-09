@@ -29,19 +29,27 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
   const boxRef = useRef(null);
 
   useEffect(() => {
-    api.assistantHistory(sid.current).then((h) => setMsgs(h.map((m) => ({ role: m.role, text: m.text })))).catch(() => {});
+    api.assistantHistory(sid.current)
+      .then((h) => setMsgs(h.map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text }))))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs]);
 
+  const nextId = useRef(0);
+
   const ask = async (text) => {
     const question = (text ?? q).trim();
     if (!question || busy) return;
     setQ("");
     setBusy(true);
-    setMsgs((m) => [...m, { role: "user", text: question }, { role: "assistant", text: "" }]);
+    setMsgs((m) => [
+      ...m,
+      { id: `u${nextId.current++}`, role: "user", text: question },
+      { id: `a${nextId.current++}`, role: "assistant", text: "" },
+    ]);
     try {
       const res = await fetch(`${API}/assistant/ask`, {
         method: "POST",
@@ -58,14 +66,14 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
         acc += dec.decode(value, { stream: true });
         setMsgs((m) => {
           const c = [...m];
-          c[c.length - 1] = { role: "assistant", text: acc };
+          c[c.length - 1] = { ...c[c.length - 1], role: "assistant", text: acc };
           return c;
         });
       }
     } catch (e) {
       setMsgs((m) => {
         const c = [...m];
-        c[c.length - 1] = { role: "assistant", text: `Could not reach the assistant (${e.message}).` };
+        c[c.length - 1] = { ...c[c.length - 1], role: "assistant", text: `Could not reach the assistant (${e.message}).` };
         return c;
       });
     } finally {
@@ -85,7 +93,7 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
         )}
         {msgs.map((m, i) => (
           <div
-            key={i}
+            key={m.id ?? `${m.role}-${i}`}
             data-testid={`haana-msg-${m.role}-${i}`}
             className={`text-xs leading-relaxed whitespace-pre-wrap border-l-2 pl-2 py-1 ${
               m.role === "user"
@@ -105,7 +113,7 @@ export const HaanaAssistant = ({ suggestionsFor }) => {
         <div className="flex flex-wrap gap-1.5 mb-2">
           {chips.map((c, i) => (
             <button
-              key={i}
+              key={c}
               data-testid={`haana-chip-${i}`}
               disabled={busy}
               onClick={() => ask(c)}

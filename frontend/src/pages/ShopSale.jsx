@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { LineSheet } from "../components/LineSheet";
 import { StatStrip } from "../components/SheetFrame";
@@ -14,16 +14,16 @@ export default function ShopSale() {
     { key: "bill_no", label: "Bill No", width: 120, upper: true },
   ]), [parties]);
 
-  const refreshTotals = () => api.lineRows("shop-sale-rows").then((rows) => {
+  const refreshTotals = useCallback(() => api.lineRows("shop-sale-rows").then((rows) => {
     const live = rows.filter((r) => (r.item || "").trim() || (r.party_name || "").trim() || String(r.bill_no || "").trim());
     setTotals({
       lines: live.length,
       qty: live.reduce((n, r) => n + (Number(r.quantity) || 0), 0),
       bills: new Set(live.map((r) => String(r.bill_no || "").trim()).filter(Boolean)).size,
     });
-  });
+  }), []);
 
-  useEffect(() => { refreshTotals(); }, []);
+  useEffect(() => { refreshTotals(); }, [refreshTotals]);
 
   return (
     <LineSheet
